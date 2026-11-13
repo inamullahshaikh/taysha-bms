@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException
 
 
@@ -36,3 +37,14 @@ def install(app: FastAPI) -> None:
     async def _validation(_: Request, e: RequestValidationError):
         fields = {".".join(str(p) for p in err["loc"][1:]) or str(err["loc"][0]): err["msg"] for err in e.errors()}
         return JSONResponse(error_body("validation_error", "Invalid input", fields), status_code=422)
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity(_: Request, e: IntegrityError):
+        code = getattr(e.orig, "sqlstate", None)
+        constraint = getattr(getattr(e.orig, "diag", None), "constraint_name", None) or ""
+        if code == "23505":
+            return JSONResponse(error_body("duplicate", "That value is already used", {constraint: "duplicate"}), 409)
+        if code == "23503":
+            return JSONResponse(error_body("invalid_reference", "Linked record is missing or still in use",
+                                           {constraint: "reference"}), 409)
+        raise e

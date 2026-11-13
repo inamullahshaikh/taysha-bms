@@ -8,7 +8,7 @@ V, C, E, A, AP, X = "view", "create", "edit", "archive", "approve", "export"
 ALL_ACTIONS = (V, C, E, A, AP, X)
 
 FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
-    "access_management": ("Users & access", (V, E)),
+    "access_management": ("Users & access", (V, E, X)),
     "settings": ("Settings", (V, E)),
     "audit": ("Full audit log", (V, X)),
 }

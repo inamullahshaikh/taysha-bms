@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import delete, select
 
@@ -11,6 +13,7 @@ from app.auth.models import User
 from app.auth.security import end_all_sessions, hash_password
 from app.db import DB
 from app.errors import AppError, conflict, not_found
+from app.listing import ListParams, Page, apply_filters, export_response, paginate
 
 router = APIRouter(tags=["users"])
 VIEW = require_access("access_management", "view")
@@ -69,12 +72,26 @@ def features(_: User = VIEW):
     return [{"key": k, "label": label, "actions": list(actions)} for k, (label, actions) in FEATURES.items()]
 
 
-@router.get("/users", response_model=list[UserOut])
-def list_users(db: DB, include_inactive: bool = True, _: User = VIEW):
-    q = select(User).order_by(User.name)
-    if not include_inactive:
-        q = q.where(User.is_active)
-    return db.scalars(q).all()
+SEARCH = (User.name, User.email)
+SORTS = {"name": User.name, "email": User.email, "last_login_at": User.last_login_at}
+
+
+@router.get("/users", response_model=Page[UserOut])
+def list_users(db: DB, p: Annotated[ListParams, Depends()], active: bool | None = None, _: User = VIEW):
+    q = apply_filters(select(User), User, p, SEARCH, SORTS, User.name)
+    if active is not None:
+        q = q.where(User.is_active == active)
+    return paginate(db, q, p, UserOut)
+
+
+@router.get("/users/export")
+def export_users(db: DB, p: Annotated[ListParams, Depends()], format: str = "csv",
+                 _: User = require_access("access_management", "export")):
+    q = apply_filters(select(User), User, p, SEARCH, SORTS, User.name)
+    rows = [UserOut.model_validate(u).model_dump() for u in db.scalars(q)]
+    cols = [("name", "Name"), ("email", "Email"), ("is_active", "Active"), ("is_owner", "Owner"),
+            ("last_login_at", "Last login")]
+    return export_response(db, rows, cols, format, "users", "users")
 
 
 @router.get("/users/{user_id}", response_model=UserOut)
