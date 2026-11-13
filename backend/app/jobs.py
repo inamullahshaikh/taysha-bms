@@ -49,6 +49,15 @@ def _alerts(db: Session) -> str:
     return check_alerts(db)
 
 
+def _shopify(fn_name: str):
+    def run(db: Session) -> str:
+        from app.integrations import shopify
+
+        return getattr(shopify, fn_name)(db)
+
+    return run
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -66,6 +75,9 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "overdue_invoices": (timedelta(hours=1), _overdue_invoices),
     "overdue_supplier_bills": (timedelta(hours=1), _overdue_bills),
     "alerts": (timedelta(minutes=30), _alerts),
+    "shopify_orders": (timedelta(minutes=15), _shopify("poll_orders")),
+    "shopify_stock": (timedelta(minutes=10), _shopify("push_stock")),
+    "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),
     "backup": (timedelta(days=1), _backup),
     "restore_check": (timedelta(days=7), _restore_check),
 }

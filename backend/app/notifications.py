@@ -200,6 +200,12 @@ def check_alerts(db: Session) -> str:
                                 f"{m.reason.title()} of {p.name}: {m.quantity.normalize():f} (~Rs {value:,.0f})",
                                 m.note, f"/stock/movements?product_id={p.id}")
 
+    # integration failures not yet resolved
+    from app.integrations.shopify import SyncLog
+
+    for e in db.scalars(select(SyncLog).where(SyncLog.status == "error", SyncLog.resolved.is_(False))):
+        hit("failed_sync", str(e.id), f"Shopify {e.kind} sync failed", e.message, "/settings/integrations")
+
     for kind, keys in found.items():
         clear_others(db, kind, keys)
     return f"{sent} notifications sent"

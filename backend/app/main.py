@@ -9,6 +9,7 @@ from app import (  # noqa: F401
 from app.auth import mfa_router, router as auth_router, users_router
 from app.config import settings
 from app.documents import router as documents
+from app.integrations import shopify
 from app.inventory import router as inventory
 from app.orders import router as orders
 from app.production import quality, router as production
@@ -35,7 +36,7 @@ errors.install(app)
 
 MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
            suppliers, orders, documents, jobs, expenses, reports, backup, inventory, purchasing, barcodes,
-           notifications, returns, receivables, production, quality)
+           notifications, returns, receivables, production, quality, shopify)
 for module in MODULES:
     for r in module.routers:
         app.include_router(r)

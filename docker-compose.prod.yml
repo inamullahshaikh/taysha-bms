@@ -4,6 +4,7 @@
 x-app-env: &app-env
   DATABASE_URL: postgresql+psycopg://taysha:${POSTGRES_PASSWORD}@db:5432/taysha
   COOKIE_SECURE: "true"
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
   UPLOAD_DIR: /data/uploads
   BACKUP_DIR: /data/backups
   DOCS_ENABLED: ${DOCS_ENABLED:-false}

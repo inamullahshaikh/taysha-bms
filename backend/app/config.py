@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://taysha:taysha@localhost:5433/taysha"
     test_database_url: str = "postgresql+psycopg://taysha:taysha@localhost:5433/taysha_test"
 
+    # Encrypts stored integration credentials. Set a long random value in production.
+    secret_key: str = "dev-only-change-me"
+
     # Sessions
     cookie_name: str = "taysha_session"
     cookie_secure: bool = True

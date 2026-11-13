@@ -75,6 +75,7 @@ class Order(Entity, Base):
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_reason: Mapped[str | None] = mapped_column(Text)
+    external_data: Mapped[dict | None] = mapped_column(JSONB)  # e.g. Shopify totals, gateway, fulfilment sync
 
     @property
     def balance_due(self) -> Decimal:

@@ -11,3 +11,4 @@ from app.purchasing import models as purchasing_models  # noqa: F401
 from app import notifications  # noqa: F401
 from app import returns  # noqa: F401
 from app.production import models as production_models  # noqa: F401
+from app.integrations import shopify  # noqa: F401

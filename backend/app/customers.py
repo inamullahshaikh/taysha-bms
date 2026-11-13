@@ -39,6 +39,7 @@ class Customer(Entity, Base):
     preferences: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
     marketing_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
+    shopify_id: Mapped[str | None] = mapped_column(String(40), unique=True)
 
 
 class CustomerAddress(Entity, Base):

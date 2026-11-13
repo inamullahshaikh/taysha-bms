@@ -18,6 +18,8 @@ dependencies = [
     "openpyxl>=3.1",
     "segno>=1.6",
     "python-barcode>=0.15",
+    "httpx>=0.28",
+    "cryptography>=44",
 ]
 
 [dependency-groups]
