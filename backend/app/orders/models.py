@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, Entity, Money, Qty
 
-ORDER_TYPES = ("retail", "wholesale", "corporate", "cafe", "stall", "sample", "promotional")
+ORDER_TYPES = ("retail", "wholesale", "corporate", "cafe", "stall", "sample", "promotional", "replacement")
 ORDER_STATUSES = ("draft", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled", "returned",
                   "refunded")
 PAYMENT_STATUSES = ("unpaid", "partially_paid", "paid", "cod_pending", "refunded", "failed")

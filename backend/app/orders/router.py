@@ -27,7 +27,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 VIEW, CREATE, EDIT, EXPORT = (require_access("orders", a) for a in ("view", "create", "edit", "export"))
 PAY_VIEW, PAY_CREATE = require_access("order_payments", "view"), require_access("order_payments", "create")
 
-OrderType = Literal["retail", "wholesale", "corporate", "cafe", "stall", "sample", "promotional"]
+OrderType = Literal["retail", "wholesale", "corporate", "cafe", "stall", "sample", "promotional", "replacement"]
 OrderStatus = Literal["draft", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled",
                       "returned", "refunded"]
 PaymentStatus = Literal["unpaid", "partially_paid", "paid", "cod_pending", "refunded", "failed"]

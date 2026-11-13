@@ -26,6 +26,8 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "inventory": ("Stock & warehouses", (V, C, E, AP, X)),
     "purchasing": ("Purchase requests & orders", (V, C, E, AP, X)),
     "supplier_bills": ("Supplier bills & payments", (V, C, E, X)),
+    "returns": ("Returns & refunds", (V, C, E, X)),
+    "complaints": ("Complaints", (V, C, E, X)),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -49,4 +51,6 @@ ENTITY_FEATURE: dict[str, str] = {
     "shipments": "orders",
     **{t: "purchasing" for t in ("purchase_requests", "purchase_orders", "goods_receipts", "supplier_ratings")},
     **{t: "supplier_bills" for t in ("supplier_bills", "supplier_payments")},
+    "returns": "returns",
+    "complaints": "complaints",
 }

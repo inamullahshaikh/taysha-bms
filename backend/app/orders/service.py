@@ -21,7 +21,7 @@ from app.products.pricing import current_cost, resolve_price, tax_rate_of
 
 ZERO = Decimal(0)
 TYPE_PRICE_LIST = {"wholesale": "wholesale", "cafe": "cafe", "distributor": "distributor"}
-FREE_ORDER_TYPES = ("sample", "promotional")
+FREE_ORDER_TYPES = ("sample", "promotional", "replacement")
 LOCKED = ("cancelled", "returned", "refunded")
 
 
