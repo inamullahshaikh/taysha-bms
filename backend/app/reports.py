@@ -297,12 +297,38 @@ def purchasing_metrics(db: Session, user: User, start: date, end: date) -> dict:
     return out
 
 
+def production_metrics(db: Session, start: date, end: date, show_cost: bool) -> dict:
+    from app.production.models import ProductionOrder as PO
+
+    done = select(PO).where(PO.status == "completed", func.date(PO.completed_at).between(start, end)).subquery()
+    r = db.execute(select(func.count(), func.coalesce(func.sum(done.c.output_quantity), 0),
+                          func.coalesce(func.sum(done.c.planned_quantity), 0),
+                          func.coalesce(func.sum(done.c.rejected_quantity), 0),
+                          func.coalesce(func.sum(done.c.wastage_quantity), 0),
+                          func.coalesce(func.sum(done.c.actual_cost), 0))).one()
+    n, output, planned, rejected, wasted, cost = r
+    made = output + rejected + wasted
+    counts = dict(db.execute(select(PO.status, func.count()).group_by(PO.status)).all())
+    t = local_today()
+    out = {"completed_orders": n, "output_quantity": output, "rejected_quantity": rejected,
+           "wastage_quantity": wasted,
+           "efficiency_pct": (output / planned * 100).quantize(Decimal("0.1")) if planned else None,
+           "wastage_pct": ((rejected + wasted) / made * 100).quantize(Decimal("0.1")) if made else None,
+           "active_orders": counts.get("released", 0) + counts.get("in_progress", 0),
+           "pending_orders": counts.get("draft", 0),
+           "scheduled_next_7_days": db.scalar(select(func.count()).select_from(PO).where(
+               PO.status.in_(("draft", "released")), PO.planned_start.between(t, t + timedelta(days=7))))}
+    if show_cost:
+        out["average_unit_cost"] = (cost / output).quantize(Decimal("0.01")) if output else None
+    return out
+
+
 # ---------- dashboard ----------
 
 dashboard = APIRouter(prefix="/dashboard", tags=["dashboard"])
 DEFAULT_WIDGETS = ["sales_summary", "order_status", "sales_trend", "sales_by_channel", "top_products",
                    "profit_summary", "expenses_summary", "customers_summary", "receivables", "inventory_summary",
-                   "stock_alerts", "purchasing_summary"]
+                   "stock_alerts", "purchasing_summary", "production_summary", "production_schedule"]
 
 
 @dashboard.get("")
@@ -344,6 +370,8 @@ def get_dashboard(user: CurrentUser, db: DB, range: Range = "month", date_from: 
         out["inventory"] = inventory_metrics(db, start, end, can(db, user, "product_costs", "view"))
     if can(db, user, "purchasing", "view"):
         out["purchasing"] = purchasing_metrics(db, user, start, end)
+    if can(db, user, "production", "view"):
+        out["production"] = production_metrics(db, start, end, can(db, user, "product_costs", "view"))
     if can(db, user, "orders", "view"):
         out["trend"] = monthly_trend(db) if can(db, user, "product_costs", "view") else [
             {k: v for k, v in m.items() if k in ("month", "revenue", "net_sales")} for m in monthly_trend(db)]

@@ -12,7 +12,7 @@ from app.db import Base, Entity, Qty
 REASONS = (
     "receipt", "purchase_receipt", "opening", "issue", "sale", "sample", "internal_use", "transfer_out",
     "transfer_in", "adjustment", "damage", "wastage", "expired", "count", "customer_return",
-    "production_in", "production_out", "supplier_return",
+    "production_in", "production_out", "production_return", "supplier_return",
 )
 COSTED_IN = ("receipt", "purchase_receipt", "opening", "production_in")  # these carry a unit cost and move the average
 
@@ -108,10 +108,14 @@ class ProductStockCost(Base):
 
 
 class StockReservation(Base):
+    """Stock held for a sales order line or a production order's materials."""
+
     __tablename__ = "stock_reservations"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
-    order_line_id: Mapped[int] = mapped_column(ForeignKey("order_lines.id", ondelete="CASCADE"), index=True)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    order_line_id: Mapped[int | None] = mapped_column(ForeignKey("order_lines.id", ondelete="CASCADE"), index=True)
+    production_order_id: Mapped[int | None] = mapped_column(ForeignKey("production_orders.id", ondelete="CASCADE"),
+                                                            index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"))
     quantity: Mapped[Qty]

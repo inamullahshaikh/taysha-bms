@@ -46,6 +46,9 @@ class Company(Entity, Base):
     expense_approval_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # above this: owner approves
     purchase_approval_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     default_warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id", use_alter=True))
+    labour_rate_per_hour: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0), server_default="0")
+    overhead_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal(0), server_default="0")
+    production_requires_qc: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class Branch(Entity, Base):
@@ -125,6 +128,9 @@ class CompanyIn(BaseModel):
     expense_approval_limit: Decimal | None = Field(None, ge=0)
     purchase_approval_limit: Decimal | None = Field(None, ge=0)
     default_warehouse_id: int | None = None
+    labour_rate_per_hour: Decimal | None = Field(None, ge=0)
+    overhead_pct: Decimal | None = Field(None, ge=0, le=500)
+    production_requires_qc: bool | None = None
 
 
 class CompanyOut(CompanyIn):

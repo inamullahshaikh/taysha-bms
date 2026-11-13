@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}<h1>{{ "BATCH SHEET" if doc == "batch_sheet" else "PICK LIST" }}</h1><div>{{ po.number }}</div>
+<div>{{ (po.planned_start or po.created_at)|date }}</div>{% endblock %}
+{% block body %}
+<div class="cols">
+  <div><div class="label">Product</div><b>{{ product.name }}</b><br>{{ product.sku }}</div>
+  <div><div class="label">Quantity</div>{{ po.planned_quantity|qty }} planned{% if po.output_quantity is not none %}<br>{{ po.output_quantity|qty }} made{% endif %}</div>
+  <div><div class="label">Recipe</div>Version {{ recipe.version }} · yield {{ recipe.yield_quantity|qty }}/batch
+    {% if batch %}<br><b>Batch {{ batch.number }}</b>{% if batch.expiry_date %} · EXP {{ batch.expiry_date|date }}{% endif %}{% endif %}</div>
+</div>
+
+<table>
+  <tr><th>{{ "Picked" if doc == "pick_list" else "" }}</th><th>Material</th><th class="num">Required</th><th class="num">Issued</th><th>Batches used</th></tr>
+  {% for m in materials %}
+  <tr><td>{% if doc == "pick_list" %}<span class="check"></span>{% endif %}</td>
+      <td>{{ m.name }}<br><span class="muted">{{ m.sku }}</span></td>
+      <td class="num">{{ m.required|qty }}</td><td class="num">{{ m.issued|qty }}</td>
+      <td>{% for b in issued if b.product_id == m.product_id %}{{ b.batch or "—" }} ({{ b.quantity|qty }}){% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+  {% endfor %}
+</table>
+
+{% if doc == "batch_sheet" %}
+<table style="margin-top:12px">
+  <tr><th>Stage</th><th>Status</th><th>Started</th><th>Finished</th><th>Signed</th></tr>
+  {% for s in stages %}
+  <tr><td>{{ s.name }}</td><td>{{ s.status|label }}</td><td>{{ s.started_at|date }}</td><td>{{ s.finished_at|date }}</td><td>____________</td></tr>
+  {% endfor %}
+</table>
+{% if recipe.instructions %}<div class="box"><div class="label">Method</div><div style="white-space: pre-line">{{ recipe.instructions }}</div></div>{% endif %}
+<div class="cols" style="margin-top:12px">
+  <div><div class="label">Output</div>{{ po.output_quantity|qty if po.output_quantity is not none else "______" }}</div>
+  <div><div class="label">Rejected</div>{{ po.rejected_quantity|qty if po.rejected_quantity is not none else "______" }}</div>
+  <div><div class="label">Wastage</div>{{ po.wastage_quantity|qty if po.wastage_quantity is not none else "______" }}</div>
+</div>
+{% if po.notes %}<div class="box"><div class="label">Notes</div>{{ po.notes }}</div>{% endif %}
+<div class="footer">Production supervisor: ____________________ &nbsp;&nbsp; QC: ____________________</div>
+{% endif %}
+{% endblock %}

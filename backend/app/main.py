@@ -11,6 +11,7 @@ from app.config import settings
 from app.documents import router as documents
 from app.inventory import router as inventory
 from app.orders import router as orders
+from app.production import quality, router as production
 from app.products import router as products
 from app.purchasing import router as purchasing
 
@@ -34,7 +35,7 @@ errors.install(app)
 
 MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
            suppliers, orders, documents, jobs, expenses, reports, backup, inventory, purchasing, barcodes,
-           notifications, returns, receivables)
+           notifications, returns, receivables, production, quality)
 for module in MODULES:
     for r in module.routers:
         app.include_router(r)
