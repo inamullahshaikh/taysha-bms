@@ -15,6 +15,7 @@ from app.main import app
 
 TEST_URL = settings.test_database_url
 settings.cookie_secure = False  # TestClient talks plain http
+settings.upload_dir = "/tmp/taysha-test-uploads"
 PASSWORD = "password123"
 _HASH = hash_password(PASSWORD)  # hash once, argon2 is slow on purpose
 
