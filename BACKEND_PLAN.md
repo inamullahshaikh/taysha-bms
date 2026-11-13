@@ -27,6 +27,8 @@ Feature list: [FEATURES_AND_TODO.md](FEATURES_AND_TODO.md) · Frontend tickets: 
 |---|---|
 | Currency | PKR only (no multi-currency) |
 | Tax | Selling prices are **tax-inclusive**; tax is extracted from line totals |
+| Delivery charges | Untaxed |
+| Rounding | Lines keep paisa; order/invoice grand total rounded to whole rupees with a rounding line |
 | Costing | Weighted average cost |
 | Timezone | Asia/Karachi for "today / this month" |
 | Git | One commit per ticket |
