@@ -4,7 +4,7 @@ from fastapi import FastAPI, encoders
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import (  # noqa: F401
-    attachments, audit_router, company, customers, errors, expenses, jobs, lookups, models, reports, suppliers,
+    attachments, audit_router, backup, company, customers, errors, expenses, jobs, lookups, models, reports, suppliers,
 )
 from app.auth import mfa_router, router as auth_router, users_router
 from app.config import settings
@@ -15,7 +15,12 @@ from app.products import router as products
 # Money must never become a float in JSON: plain-dict responses get Decimal -> "1200.00" like pydantic models do
 encoders.ENCODERS_BY_TYPE[Decimal] = str
 
-app = FastAPI(title="Taysha BMS")
+app = FastAPI(
+    title="Taysha BMS",
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -26,7 +31,7 @@ app.add_middleware(
 errors.install(app)
 
 MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
-           suppliers, orders, documents, jobs, expenses, reports)
+           suppliers, orders, documents, jobs, expenses, reports, backup)
 for module in MODULES:
     for r in module.routers:
         app.include_router(r)

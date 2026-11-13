@@ -1,0 +1,71 @@
+# Production / staging. Usage:
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#   staging: docker compose -p taysha-staging -f docker-compose.prod.yml --env-file .env.staging up -d --build
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://taysha:${POSTGRES_PASSWORD}@db:5432/taysha
+  COOKIE_SECURE: "true"
+  UPLOAD_DIR: /data/uploads
+  BACKUP_DIR: /data/backups
+  DOCS_ENABLED: ${DOCS_ENABLED:-false}
+  CORS_ORIGINS: '["https://${DOMAIN}"]'
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taysha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: taysha
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taysha"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment: *app-env
+    volumes: [uploads:/data/uploads, backups:/data/backups]
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips='*' --root-path /api"
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      retries: 3
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    environment: *app-env
+    volumes: [uploads:/data/uploads, backups:/data/backups]
+    command: python -m app.jobs --loop
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv/frontend:ro
+      - caddy_data:/data
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  uploads:
+  backups:
+  caddy_data:

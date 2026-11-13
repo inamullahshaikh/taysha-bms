@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:17
     environment:
       POSTGRES_USER: taysha
       POSTGRES_PASSWORD: taysha
@@ -19,10 +19,12 @@ services:
       TEST_DATABASE_URL: postgresql+psycopg://taysha:taysha@db:5432/taysha_test
       COOKIE_SECURE: "false"
       UPLOAD_DIR: /data/uploads
+      BACKUP_DIR: /data/backups
     ports: ["8010:8000"]
     volumes:
       - ./backend:/app
       - uploads:/data/uploads
+      - backups:/data/backups
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db: { condition: service_healthy }
@@ -32,9 +34,11 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://taysha:taysha@db:5432/taysha
       UPLOAD_DIR: /data/uploads
+      BACKUP_DIR: /data/backups
     volumes:
       - ./backend:/app
       - uploads:/data/uploads
+      - backups:/data/backups
     command: python -m app.jobs --loop
     depends_on:
       db: { condition: service_healthy }
@@ -42,3 +46,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  backups:

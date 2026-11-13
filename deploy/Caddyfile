@@ -1,0 +1,23 @@
+# HTTPS certificates are issued automatically for {$DOMAIN}.
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# API: https://DOMAIN/api/... -> FastAPI
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Frontend (React build): single-page app
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}

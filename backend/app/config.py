@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_mb: int = 20
 
+    backup_dir: str = "backups"
+    backup_retention_days: int = 14
+
     timezone: str = "Asia/Karachi"
     currency: str = "PKR"
 
@@ -32,6 +35,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
 
     cors_origins: list[str] = ["http://localhost:5173"]
+    docs_enabled: bool = True  # /docs and /openapi.json; off in production
 
 
 settings = Settings()
