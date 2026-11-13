@@ -15,6 +15,8 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "products": ("Products", CRUD),
     "product_prices": ("Change product prices", (E,)),
     "product_costs": ("Product costs & margins", (V, E)),
+    "customers": ("Customers", CRUD),
+    "suppliers": ("Suppliers", CRUD),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -25,4 +27,6 @@ ENTITY_FEATURE: dict[str, str] = {
     **{t: "products" for t in ("products", "product_categories", "product_prices", "bundle_components",
                                "product_units")},
     "product_costs": "product_costs",
+    **{t: "customers" for t in ("customers", "customer_addresses", "customer_notes")},
+    **{t: "suppliers" for t in ("suppliers", "supplier_contacts", "supplier_items")},
 }

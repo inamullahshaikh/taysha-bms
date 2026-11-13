@@ -3,16 +3,17 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.audit import audit, snapshot
 from app.auth.access import require_access
 from app.auth.features import FEATURES
 from app.auth.models import User
 from app.db import DB
-from app.errors import not_found
+from app.errors import AppError, not_found
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
 
 
@@ -31,6 +32,23 @@ def get_or_404(db, model, id_: int, what: str | None = None):
     return obj
 
 
+def equality_filters(query, request: Request, filters: dict):
+    """?name=value for each allowed filter. JSONB list columns match when they contain the value."""
+    for name, col in filters.items():
+        raw = request.query_params.get(name)
+        if raw is None or raw == "":
+            continue
+        if isinstance(col.type, JSONB):
+            query = query.where(col.contains([raw]))
+            continue
+        try:
+            value = col.type.python_type(raw) if col.type.python_type is not bool else raw.lower() == "true"
+        except (ValueError, TypeError):
+            raise AppError(422, "invalid_filter", f"Invalid value for {name}", {name: "invalid"})
+        query = query.where(col == value)
+    return query
+
+
 def crud_router(
     model,
     *,
@@ -41,27 +59,32 @@ def crud_router(
     out: type[BaseModel],
     search: tuple = (),
     sorts: dict | None = None,
+    filters: dict | None = None,
     default_sort=None,
     tags: list[str] | None = None,
 ) -> APIRouter:
-    r = APIRouter(prefix=prefix, tags=tags or [prefix.strip("/")])
+    r = APIRouter(prefix=prefix, tags=tags or [prefix.strip("/").split("/")[-1]])
     actions = FEATURES[feature][1]
 
     def need(a: str, fallback: str):  # e.g. "settings" has only view/edit: creating a branch needs edit
         return require_access(feature, a if a in actions else fallback)
 
-    view, add, edit, arch, exp = need("view", "view"), need("create", "edit"), need("edit", "edit"),         need("archive", "edit"), need("export", "view")
-    sorts = sorts or {}
+    view, add, edit = need("view", "view"), need("create", "edit"), need("edit", "edit")
+    arch, exp = need("archive", "edit"), need("export", "view")
+    sorts, filters = sorts or {}, filters or {}
+
+    def query(p: ListParams, request: Request):
+        q = apply_filters(select(model), model, p, search, sorts, default_sort)
+        return equality_filters(q, request, filters)
 
     @r.get("", response_model=Page[out])
-    def list_(db: DB, p: Annotated[ListParams, Depends()], _: User = view):
-        q = apply_filters(select(model), model, p, search, sorts, default_sort)
-        return paginate(db, q, p, out)
+    def list_(db: DB, p: Annotated[ListParams, Depends()], request: Request, _: User = view):
+        return paginate(db, query(p, request), p, out)
 
     @r.get("/export")
-    def export(db: DB, p: Annotated[ListParams, Depends()], format: str = "csv", _: User = exp):
-        q = apply_filters(select(model), model, p, search, sorts, default_sort)
-        rows = [out.model_validate(o).model_dump() for o in db.scalars(q).all()]
+    def export(db: DB, p: Annotated[ListParams, Depends()], request: Request, format: str = "csv",
+               _: User = exp):
+        rows = [out.model_validate(o).model_dump() for o in db.scalars(query(p, request)).all()]
         cols = [(k, k.replace("_", " ").title()) for k in out.model_fields]
         return export_response(db, rows, cols, format, prefix.strip("/").replace("/", "-"), model.__tablename__)
 
