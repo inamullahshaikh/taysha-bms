@@ -1,7 +1,5 @@
-import smtplib
 from datetime import date, datetime
 from decimal import Decimal
-from email.message import EmailMessage
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
@@ -13,7 +11,6 @@ from app.audit import audit, snapshot
 from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
-from app.config import settings
 from app.crud import RecordOut, get_or_404
 from app.customers import Customer
 from app.db import DB
@@ -23,6 +20,7 @@ from app.documents.service import (
 )
 from app.errors import AppError
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
+from app.mailer import send_email
 from app.numbering import next_number
 from app.company import get_company
 from app.orders.calc import LineCalc, calculate
@@ -453,21 +451,6 @@ def document_pdf(doc_id: int, db: DB, _: User = VIEW):
     return pdf_response(render_doc(db, d), filename(d))
 
 
-def send_email(to: str, subject: str, body: str, attachment: bytes, attachment_name: str) -> None:
-    if not settings.smtp_host:
-        raise AppError(503, "email_not_configured", "Email sending isn't set up (SMTP settings missing)")
-    msg = EmailMessage()
-    msg["From"], msg["To"], msg["Subject"] = settings.smtp_from, to, subject
-    msg.set_content(body)
-    msg.add_attachment(attachment, maintype="application", subtype="pdf", filename=attachment_name)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as s:
-        if settings.smtp_starttls:
-            s.starttls()
-        if settings.smtp_user:
-            s.login(settings.smtp_user, settings.smtp_password)
-        s.send_message(msg)
-
-
 @router.post("/{doc_id}/email", status_code=204)
 def email_document(doc_id: int, body: EmailIn, db: DB, _: User = EDIT):
     d = get_doc(db, doc_id)
@@ -481,7 +464,7 @@ def email_document(doc_id: int, body: EmailIn, db: DB, _: User = EDIT):
     send_email(to, body.subject or f"{title} {d.number} from {company}",
                body.message or f"Dear {d.customer_name or 'customer'},\n\nPlease find attached {title.lower()} "
                                 f"{d.number}.\n\nRegards,\n{company}",
-               render_doc(db, d), filename(d))
+               [(render_doc(db, d), filename(d))])
     audit(db, "email", entity_type="sales_documents", entity_id=d.id, note=f"sent to {to}")
 
 

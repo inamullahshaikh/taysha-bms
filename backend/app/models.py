@@ -8,3 +8,4 @@ from app.documents import models as document_models  # noqa: F401
 from app import reports  # noqa: F401
 from app.inventory import models as inventory_models  # noqa: F401
 from app.purchasing import models as purchasing_models  # noqa: F401
+from app import notifications  # noqa: F401
