@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}<h1>{{ title|upper }}</h1><div>{{ start|date }} – {{ end|date }}</div>{% endblock %}
+{% block body %}
+<table>
+  <tr>{% for key, header in cols %}<th{% if not loop.first %} class="num"{% endif %}>{{ header }}</th>{% endfor %}</tr>
+  {% for r in rows %}
+  <tr>{% for key, header in cols %}
+    {% set v = r.get(key) %}
+    <td{% if not loop.first %} class="num"{% endif %}>{% if v is number and not loop.first %}{{ v|money if v is not integer else v }}{% else %}{{ v if v is not none else "" }}{% endif %}</td>
+  {% endfor %}</tr>
+  {% endfor %}
+</table>
+<div class="footer">Generated {{ today|date }}</div>
+{% endblock %}
