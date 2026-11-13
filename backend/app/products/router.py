@@ -455,3 +455,5 @@ crud_routers = [
     crud_router(SalesChannel, prefix="/settings/sales-channels", feature="settings", create=CodeNameIn,
                 update=CodeNamePatch, out=CodeNameOut, default_sort=SalesChannel.id, tags=["settings"]),
 ]
+
+routers = [router, *crud_routers]

@@ -98,3 +98,5 @@ def change_password(body: ChangePasswordIn, request: Request, user: CurrentUser,
 def my_access(user: CurrentUser, db: DB) -> dict[str, list[str]]:
     """Feature -> granted actions. The frontend uses this to show/hide features."""
     return access_map(db, user)
+
+routers = [router]

@@ -54,3 +54,5 @@ def list_audit(
     if before_id:  # keyset paging
         q = q.where(AuditLog.id < before_id)
     return db.scalars(q).all()
+
+routers = [router]

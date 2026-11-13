@@ -211,3 +211,5 @@ def copy_access(user_id: int, source_id: int, db: DB, actor: User = EDIT) -> dic
     if source.is_owner:
         raise AppError(422, "owner_source", "Owners have everything implicitly; make the user an owner instead")
     return replace_access(db, actor, get_user(db, user_id), access_map(db, source))
+
+routers = [router]

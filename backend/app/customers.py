@@ -234,3 +234,5 @@ def add_note(customer_id: int, body: NoteIn, db: DB, _: User = EDIT):
     db.add(n)
     audit(db, "create", n)
     return n
+
+routers = [router, *crud_routers]

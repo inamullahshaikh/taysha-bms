@@ -27,3 +27,5 @@ def lookups(_: CurrentUser, db: DB):
         "departments": _rows(db, Department, "name"),
         "product_categories": _rows(db, ProductCategory, "name", "parent_id"),
     }
+
+routers = [router]

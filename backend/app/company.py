@@ -330,3 +330,5 @@ crud_routers = [
     crud_router(FinancialPeriod, prefix="/settings/periods", feature="settings", create=PeriodIn,
                 update=PeriodPatch, out=PeriodOut, default_sort=FinancialPeriod.start_date, tags=["settings"]),
 ]
+
+routers = [router, *crud_routers]

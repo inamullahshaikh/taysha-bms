@@ -92,3 +92,5 @@ def verify(body: CodeIn, request: Request, db: DB):
     user.last_login_at = now()
     audit(db, "login", entity_type="users", entity_id=user.id, user_id=user.id)
     return {"user": UserOut.model_validate(user)}
+
+routers = [router]

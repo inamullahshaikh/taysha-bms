@@ -151,3 +151,5 @@ def archive(attachment_id: int, user: CurrentUser, db: DB):
     db.flush()
     db.refresh(a)
     return a
+
+routers = [router]
