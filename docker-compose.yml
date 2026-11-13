@@ -27,6 +27,18 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
+  scheduler:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://taysha:taysha@db:5432/taysha
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - ./backend:/app
+      - uploads:/data/uploads
+    command: python -m app.jobs --loop
+    depends_on:
+      db: { condition: service_healthy }
+
 volumes:
   pgdata:
   uploads:
