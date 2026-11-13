@@ -40,6 +40,8 @@ class Customer(Entity, Base):
     notes: Mapped[str | None] = mapped_column(Text)
     marketing_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
     shopify_id: Mapped[str | None] = mapped_column(String(40), unique=True)
+    territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id"))
+    sales_rep_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class CustomerAddress(Entity, Base):
@@ -91,6 +93,8 @@ class CustomerIn(BaseModel):
     preferences: str | None = None
     notes: str | None = None
     marketing_opt_in: bool = False
+    territory_id: int | None = None
+    sales_rep_id: int | None = None
 
 
 class CustomerPatch(BaseModel):
@@ -109,6 +113,8 @@ class CustomerPatch(BaseModel):
     preferences: str | None = None
     notes: str | None = None
     marketing_opt_in: bool | None = None
+    territory_id: int | None = None
+    sales_rep_id: int | None = None
 
 
 class CustomerOut(RecordOut, CustomerIn):
@@ -169,7 +175,9 @@ base = crud_router(
     Customer, prefix="/customers", feature="customers", create=CustomerCreate, update=CustomerUpdate,
     out=CustomerOut, search=(Customer.name, Customer.phone, Customer.email, Customer.company_name),
     sorts={"name": Customer.name, "created_at": Customer.created_at},
-    filters={"type": Customer.type, "tag": Customer.tags, "source": Customer.source}, default_sort=Customer.name,
+    filters={"type": Customer.type, "tag": Customer.tags, "source": Customer.source,
+             "territory_id": Customer.territory_id, "sales_rep_id": Customer.sales_rep_id},
+    default_sort=Customer.name,
 )
 crud_routers = [base]
 router = APIRouter(prefix="/customers", tags=["customers"])

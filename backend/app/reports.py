@@ -100,7 +100,16 @@ def status_counts(db: Session, start: date, end: date) -> dict:
     return dict(rows)
 
 
-def sales_by(db: Session, start: date, end: date, dim: str, limit: int | None = None) -> list[dict]:
+def sales_by(db: Session, start: date, end: date, dim: str, limit: int | None = None, where=None) -> list[dict]:
+    if dim in ("territory", "sales_rep"):
+        col = Customer.territory_id if dim == "territory" else Customer.sales_rep_id
+        q = (select(col.label("key"), func.count().label("orders"), func.sum(Order.grand_total).label("revenue"),
+                    func.sum(Order.net_total).label("net_sales"))
+             .join(Customer, Customer.id == Order.customer_id).where(counted(start, end)).group_by(col)
+             .order_by(func.sum(Order.grand_total).desc()))
+        if where is not None:
+            q = q.where(where)
+        return [{**dict(r._mapping), "label": r.key} for r in db.execute(q)]
     if dim == "product":
         q = (select(OrderLine.product_id.label("key"), func.max(OrderLine.description).label("label"),
                     func.sum(OrderLine.quantity).label("quantity"), func.sum(OrderLine.line_total).label("revenue"),
@@ -109,6 +118,8 @@ def sales_by(db: Session, start: date, end: date, dim: str, limit: int | None = 
                     func.count(func.distinct(OrderLine.order_id)).label("orders"))
              .join(Order, Order.id == OrderLine.order_id).where(counted(start, end))
              .group_by(OrderLine.product_id).order_by(func.sum(OrderLine.line_total).desc()))
+        if where is not None:
+            q = q.where(where)
         rows = [dict(r._mapping) for r in db.execute(q.limit(limit) if limit else q)]
         for r in rows:
             r["cogs"] = money(r["cogs"])
@@ -125,6 +136,8 @@ def sales_by(db: Session, start: date, end: date, dim: str, limit: int | None = 
                 func.sum(Order.discount_total).label("discounts"))
          .where(counted(start, end)).group_by(col)
          .order_by(col if dim in ("day", "month") else func.sum(Order.grand_total).desc()))
+    if where is not None:
+        q = q.where(where)
     return [{**dict(r._mapping), "label": r.key} for r in db.execute(q.limit(limit) if limit else q)]
 
 
@@ -418,13 +431,16 @@ def report_response(db: Session, name: str, title: str, rows: list[dict], cols: 
 
 @reports.get("/sales")
 def sales_report(db: DB, group_by: Literal["product", "channel", "customer", "order_type", "city", "day", "month",
-                                           "source", "branch"] = "product",
+                                           "source", "branch", "territory", "sales_rep"] = "product",
                  range: Range = "month", date_from: date | None = None, date_to: date | None = None,
+                 order_type: str | None = None, customer_id: int | None = None,
                  format: Fmt = "json", user: User = require_access("orders", "view")):
     start, end = period(range, date_from, date_to)
     if format != "json" and not can(db, user, "orders", "export"):
         raise AppError(403, "forbidden", "You don't have export access to sales")
-    rows = sales_by(db, start, end, group_by)
+    conds = [c for c in (Order.order_type == order_type if order_type else None,
+                         Order.customer_id == customer_id if customer_id else None) if c is not None]
+    rows = sales_by(db, start, end, group_by, where=and_(*conds) if conds else None)
     show_cost = can(db, user, "product_costs", "view")
     if not show_cost:
         for r in rows:

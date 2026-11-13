@@ -58,6 +58,12 @@ def _shopify(fn_name: str):
     return run
 
 
+def _recurring(db: Session) -> str:
+    from app.wholesale import run_due_recurring
+
+    return run_due_recurring(db)
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -75,6 +81,7 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "overdue_invoices": (timedelta(hours=1), _overdue_invoices),
     "overdue_supplier_bills": (timedelta(hours=1), _overdue_bills),
     "alerts": (timedelta(minutes=30), _alerts),
+    "recurring_orders": (timedelta(hours=1), _recurring),
     "shopify_orders": (timedelta(minutes=15), _shopify("poll_orders")),
     "shopify_stock": (timedelta(minutes=10), _shopify("push_stock")),
     "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),

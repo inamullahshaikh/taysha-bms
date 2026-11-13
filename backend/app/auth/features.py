@@ -32,6 +32,7 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "production": ("Production", (V, C, E, X)),
     "quality": ("Quality & food safety", (V, C, E, X)),
     "pos": ("Point of sale & events", (V, C, E, X)),
+    "distribution": ("Delivery routes & territories", (V, E)),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -61,4 +62,6 @@ ENTITY_FEATURE: dict[str, str] = {
     "production_orders": "production",
     **{t: "quality" for t in ("qc_templates", "qc_checks", "recalls", "food_safety_records")},
     **{t: "pos" for t in ("pos_events", "pos_sessions")},
+    **{t: "distribution" for t in ("delivery_routes", "route_stops", "territories")},
+    **{t: "orders" for t in ("recurring_orders", "sell_through")},
 }

@@ -38,6 +38,18 @@ def pick_price_list(db: Session, order_type: str, customer: Customer | None, exp
         select(PriceList).where(PriceList.code == "retail"))
 
 
+def fallback_list(db: Session, order_type: str, customer: Customer | None) -> PriceList:
+    code = TYPE_PRICE_LIST.get(order_type) or TYPE_PRICE_LIST.get(customer.type if customer else "", "retail")
+    return db.scalar(select(PriceList).where(PriceList.code == code)) or db.scalar(
+        select(PriceList).where(PriceList.code == "retail"))
+
+
+def check_moq(db: Session, customer_id, product_id, qty, line_no) -> None:
+    from app.wholesale import check_moq as _check  # wholesale builds on orders
+
+    _check(db, customer_id, product_id, qty, line_no)
+
+
 def discount_code_value(db: Session, code: str, subtotal: Decimal, on: date,
                         exclude_order_id: int | None = None) -> tuple[DiscountCode, Decimal, Decimal]:
     """Validate a code; returns (code, pct, amount)."""
@@ -81,7 +93,10 @@ def price_order(db: Session, user: User, body, order_id: int | None = None) -> d
             raise not_found(f"Product on line {i + 1}")
         if p.archived_at is not None or p.status == "discontinued":
             raise AppError(422, "product_unavailable", f"{p.name} is no longer sold", {f"lines.{i}": "unavailable"})
+        check_moq(db, body.customer_id, p.id, ln.quantity, i + 1)
         listed = resolve_price(db, p.id, pl.id, on) if pl else None
+        if listed is None and pl is not None and pl.customer_id:  # customer list without this product
+            listed = resolve_price(db, p.id, fallback_list(db, body.order_type, customer).id, on)
         list_price = listed.price if listed else None
         if body.order_type in FREE_ORDER_TYPES and ln.unit_price is None:
             unit_price = ZERO
@@ -190,6 +205,9 @@ def change_status(db: Session, order: Order, to: str, note: str | None = None) -
     frm = order.status
     now = utcnow()
     if to == "confirmed":
+        from app.wholesale import check_credit
+
+        check_credit(db, order)
         order.confirmed_at = now
         snapshot_costs(db, order)
         stock.reserve_order(db, order)
