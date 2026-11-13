@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from app.audit import AuditLog, audit
+from app.auth.access import access_map
 from app.auth.deps import CurrentUser, client_ip, session_from_cookie
 from app.auth.models import User
 from app.auth.security import end_all_sessions, hash_password, now, sha256, start_session, verify_password
@@ -91,3 +92,9 @@ def change_password(body: ChangePasswordIn, request: Request, user: CurrentUser,
     user.password_hash = hash_password(body.new_password)
     end_all_sessions(db, user.id, except_hash=sha256(request.cookies[settings.cookie_name]))
     audit(db, "change_password", entity_type="users", entity_id=user.id)
+
+
+@router.get("/me/access")
+def my_access(user: CurrentUser, db: DB) -> dict[str, list[str]]:
+    """Feature -> granted actions. The frontend uses this to show/hide features."""
+    return access_map(db, user)

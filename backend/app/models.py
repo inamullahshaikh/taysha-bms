@@ -2,3 +2,4 @@
 
 from app import audit  # noqa: F401
 from app.auth import models as auth_models  # noqa: F401
+from app.auth import access as access_models  # noqa: F401

@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app.auth.access import UserAccess
 from app.auth.models import User
 from app.auth.security import hash_password
 from app.config import settings
@@ -67,9 +68,14 @@ def client(db):
 
 @pytest.fixture
 def make_user(db):
-    def _make(email="user@example.com", owner=False, active=True, name="Test User"):
+    def _make(email="user@example.com", owner=False, active=True, name="Test User", access=()):
+        """access: iterable of "feature.action" strings, e.g. ("orders.view", "orders.create")."""
         u = User(name=name, email=email, password_hash=_HASH, is_owner=owner, is_active=active)
         db.add(u)
+        db.flush()
+        for fa in access:
+            f, a = fa.split(".")
+            db.add(UserAccess(user_id=u.id, feature=f, action=a))
         db.flush()
         return u
 
@@ -85,3 +91,15 @@ def owner_client(client, make_user):
     make_user("owner@example.com", owner=True, name="Owner")
     assert login(client, "owner@example.com").status_code == 200
     return client
+
+
+@pytest.fixture
+def user_client(client, make_user):
+    """Log in as a non-owner with the given grants: user_client("orders.view", ...)."""
+
+    def _login(*access, email="staff@example.com"):
+        make_user(email, access=access, name="Staff")
+        assert login(client, email).status_code == 200
+        return client
+
+    return _login
