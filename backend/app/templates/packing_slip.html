@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}<h1>PACKING SLIP</h1><div>{{ o.number }}</div><div>{{ o.order_date|date }}</div>{% endblock %}
+{% block body %}
+<div class="cols">
+  <div><div class="label">Ship to</div><b>{{ o.customer_name or "Walk-in" }}</b><br>{{ o.customer_phone or "" }}<br>
+    {{ o.shipping_address|address if o.delivery_method == "delivery" else "Customer pickup" }}</div>
+  <div><div class="label">Courier</div>{{ o.courier or "—" }}<br>{{ o.tracking_number or "" }}</div>
+  <div><div class="label">Payment</div>{% if o.payment_method == "cod" %}<b>COD: collect {{ (o.grand_total - o.paid_total)|money }}</b>{% else %}{{ o.payment_status|label }}{% endif %}</div>
+</div>
+<table>
+  <tr><th>Packed</th><th>Item</th><th>SKU</th><th class="num">Qty</th></tr>
+  {% for l in lines %}
+  <tr><td><span class="check"></span></td><td>{{ l.description }}</td><td>{{ l.sku }}</td><td class="num">{{ l.quantity|qty }}</td></tr>
+  {% endfor %}
+</table>
+{% if o.customer_instructions %}<div class="box"><div class="label">Customer instructions</div>{{ o.customer_instructions }}</div>{% endif %}
+<div class="footer">Packed by: ____________________ &nbsp;&nbsp; Checked by: ____________________</div>
+{% endblock %}

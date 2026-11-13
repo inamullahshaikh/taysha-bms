@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}<h1>{{ heading|default("ORDER") }}</h1><div>{{ o.number }}</div><div>{{ o.order_date|date }}</div>{% endblock %}
+{% block body %}
+<div class="cols">
+  <div><div class="label">Customer</div>{{ o.customer_name or "Walk-in" }}<br>{{ o.customer_phone or "" }}</div>
+  <div><div class="label">Deliver to</div>{{ o.shipping_address|address if o.delivery_method == "delivery" else "Pickup" }}</div>
+  <div><div class="label">Status</div>{{ o.status|label }} · {{ o.payment_status|label }}
+    {% if o.payment_method %}<br>{{ o.payment_method|replace("_", " ")|upper }}{% endif %}</div>
+</div>
+<table>
+  <tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Discount</th><th class="num">Amount</th></tr>
+  {% for l in lines %}
+  <tr><td>{{ l.line_no }}</td><td>{{ l.description }}<br><span class="muted">{{ l.sku }}</span></td>
+      <td class="num">{{ l.quantity|qty }}</td><td class="num">{{ l.unit_price|money }}</td>
+      <td class="num">{{ (l.line_discount + l.order_discount_share)|money if (l.line_discount + l.order_discount_share) else "" }}</td>
+      <td class="num">{{ l.line_total|money }}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr><td>Subtotal</td><td class="num">{{ o.subtotal|money }}</td></tr>
+  {% if o.discount_total %}<tr><td>Discounts</td><td class="num">-{{ o.discount_total|money }}</td></tr>{% endif %}
+  {% if o.delivery_charge %}<tr><td>Delivery</td><td class="num">{{ o.delivery_charge|money }}</td></tr>{% endif %}
+  {% if o.rounding %}<tr><td>Rounding</td><td class="num">{{ o.rounding|money }}</td></tr>{% endif %}
+  <tr class="grand"><td>Total (PKR)</td><td class="num">{{ o.grand_total|money }}</td></tr>
+  <tr><td class="muted">Includes sales tax</td><td class="num muted">{{ o.tax_total|money }}</td></tr>
+  {% if o.paid_total %}<tr><td>Paid</td><td class="num">{{ o.paid_total|money }}</td></tr>
+  <tr><td>Balance due</td><td class="num">{{ (o.grand_total - o.paid_total)|money }}</td></tr>{% endif %}
+</table>
+{% if o.notes %}<div class="box"><div class="label">Notes</div>{{ o.notes }}</div>{% endif %}
+{% endblock %}

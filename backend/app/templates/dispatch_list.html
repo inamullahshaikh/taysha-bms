@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}<h1>DISPATCH LIST</h1><div>{{ today|date }}</div><div>{{ orders|length }} orders</div>{% endblock %}
+{% block body %}
+<table>
+  <tr><th>Order</th><th>Customer</th><th>Address</th><th>Courier / tracking</th><th class="num">COD</th><th>Items</th></tr>
+  {% for o, lines in orders %}
+  <tr><td>{{ o.number }}</td><td>{{ o.customer_name or "" }}<br>{{ o.customer_phone or "" }}</td>
+      <td>{{ o.shipping_address|address }}</td><td>{{ o.courier or "" }}<br>{{ o.tracking_number or "" }}</td>
+      <td class="num">{{ (o.grand_total - o.paid_total)|money if o.payment_method == "cod" else "" }}</td>
+      <td>{% for l in lines %}{{ l.quantity|qty }} × {{ l.sku }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr class="grand"><td>COD to collect</td><td class="num">{{ cod_total|money }}</td></tr>
+</table>
+<div class="footer">Handed to courier by: ____________________ &nbsp;&nbsp; Courier signature: ____________________</div>
+{% endblock %}

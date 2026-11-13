@@ -127,3 +127,14 @@ def test_walk_in_sample_order_is_free(setup):
             "lines": [{"product_id": setup["product"]["id"], "quantity": "1"}]}
     o = setup["c"].post("/orders", json=body).json()
     assert o["grand_total"] == "0.00" and o["customer_id"] is None
+
+
+def test_order_pdfs(setup):
+    c = setup["c"]
+    o1 = c.post("/orders", json=order_body(setup, payment_method="cod", confirm=True)).json()
+    o2 = c.post("/orders", json=order_body(setup, confirm=True)).json()
+    for doc in ("summary", "packing_slip"):
+        r = c.get(f"/orders/{o1['id']}/pdf?doc={doc}")
+        assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    r = c.get(f"/orders/dispatch-list?ids={o1['id']},{o2['id']}")
+    assert r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")

@@ -17,6 +17,7 @@ from app.db import DB
 from app.errors import AppError
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
 from app.numbering import next_number
+from app.pdf import pdf_response, render_pdf
 from app.orders.models import DiscountCode, Order, OrderLine, OrderStatusHistory, Payment
 from app.orders.service import (
     LOCKED, apply_priced, change_status, ensure_editable, price_order, refresh_payment_status,
@@ -287,6 +288,35 @@ def export_orders(db: DB, p: Annotated[ListParams, Depends()], f: Annotated[Orde
             ("payment_status", "Payment"), ("grand_total", "Total"), ("paid_total", "Paid"),
             ("balance_due", "Balance"), ("courier", "Courier"), ("tracking_number", "Tracking")]
     return export_response(db, rows, cols, format, "orders", "orders")
+
+
+# ---------- printing ----------
+
+def order_lines(db: Session, order_id: int) -> list[OrderLine]:
+    return db.scalars(select(OrderLine).where(OrderLine.order_id == order_id).order_by(OrderLine.line_no)).all()
+
+
+@router.get("/dispatch-list")
+def dispatch_list(ids: str, db: DB, _: User = VIEW):
+    """PDF for the courier hand-over. ids = comma-separated order ids."""
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise AppError(422, "invalid_ids", "ids must be comma-separated numbers")
+    orders = db.scalars(select(Order).where(Order.id.in_(id_list)).order_by(Order.number)).all()
+    if not orders:
+        raise AppError(404, "not_found", "No orders found")
+    cod = sum((o.grand_total - o.paid_total for o in orders if o.payment_method == "cod"), ZERO)
+    data = render_pdf(db, "dispatch_list.html", orders=[(o, order_lines(db, o.id)) for o in orders], cod_total=cod)
+    return pdf_response(data, f"dispatch-list-{local_today()}.pdf")
+
+
+@router.get("/{order_id}/pdf")
+def order_pdf(order_id: int, db: DB, doc: Literal["summary", "packing_slip"] = "summary", _: User = VIEW):
+    o = get_order(db, order_id)
+    template = "order_summary.html" if doc == "summary" else "packing_slip.html"
+    data = render_pdf(db, template, o=o, lines=order_lines(db, o.id))
+    return pdf_response(data, f"{o.number}-{doc}.pdf")
 
 
 # ---------- create / edit ----------

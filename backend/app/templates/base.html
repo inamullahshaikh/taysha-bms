@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: {{ page_size|default("A4") }}; margin: 14mm 12mm 16mm;
+          @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #888; } }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #222; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start;
+          border-bottom: 2px solid {{ brand }}; padding-bottom: 8px; margin-bottom: 12px; }
+  .head img { max-height: 55px; max-width: 180px; }
+  .company { font-size: 8pt; color: #555; line-height: 1.4; }
+  .company b { font-size: 12pt; color: {{ brand }}; }
+  .doc-title { text-align: right; }
+  .doc-title h1 { margin: 0; font-size: 16pt; color: {{ brand }}; letter-spacing: 1px; }
+  .doc-title div { font-size: 9pt; margin-top: 2px; }
+  .cols { display: flex; gap: 16px; margin-bottom: 12px; }
+  .cols > div { flex: 1; }
+  .label { font-size: 7pt; text-transform: uppercase; color: #888; letter-spacing: .5px; margin-bottom: 2px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: {{ brand }}; color: #fff; text-align: left; font-weight: normal; padding: 5px 6px; font-size: 8pt; }
+  td { padding: 5px 6px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals { width: 45%; margin-left: auto; margin-top: 8px; }
+  .totals td { border: none; padding: 3px 6px; }
+  .totals .grand td { border-top: 2px solid {{ brand }}; font-weight: bold; font-size: 11pt; }
+  .muted { color: #777; }
+  .box { border: 1px solid #ddd; padding: 6px 8px; margin-top: 10px; }
+  .footer { margin-top: 18px; font-size: 8pt; color: #555; white-space: pre-line; }
+  .check { width: 14px; height: 14px; border: 1px solid #444; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="head">
+  <div class="company">
+    {% if logo %}<img src="{{ logo }}"><br>{% endif %}
+    <b>{{ company.legal_name or company.name }}</b><br>
+    {% if company.address %}{{ company.address }}<br>{% endif %}
+    {% if company.phone %}{{ company.phone }}{% endif %}{% if company.email %} · {{ company.email }}{% endif %}
+    {% if company.ntn %}<br>NTN {{ company.ntn }}{% endif %}{% if company.strn %} · STRN {{ company.strn }}{% endif %}
+  </div>
+  <div class="doc-title">{% block title %}{% endblock %}</div>
+</div>
+{% block body %}{% endblock %}
+</body>
+</html>
