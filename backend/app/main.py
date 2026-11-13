@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import attachments, audit_router, errors, models  # noqa: F401
+from app import attachments, audit_router, company, errors, models  # noqa: F401
 from app.auth import mfa_router, router as auth_router, users_router
 from app.config import settings
 
@@ -15,8 +15,10 @@ app.add_middleware(
 )
 errors.install(app)
 
-for module in (auth_router, mfa_router, users_router, audit_router, attachments):
+for module in (auth_router, mfa_router, users_router, audit_router, attachments, company):
     app.include_router(module.router)
+    for r in getattr(module, "crud_routers", ()):
+        app.include_router(r)
 
 
 @app.get("/health")

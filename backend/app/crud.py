@@ -1,5 +1,6 @@
 """Standard list/get/create/update/archive/restore/export endpoints for simple master-data tables."""
 
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -13,6 +14,14 @@ from app.auth.models import User
 from app.db import DB
 from app.errors import not_found
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
+
+
+class RecordOut(BaseModel):
+    """Base for output schemas of Entity tables."""
+
+    model_config = {"from_attributes": True}
+    id: int
+    archived_at: datetime | None = None
 
 
 def get_or_404(db, model, id_: int, what: str | None = None):

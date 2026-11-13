@@ -16,5 +16,7 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
 # Table name -> feature that guards it (for record history and attachments)
 ENTITY_FEATURE: dict[str, str] = {
     "users": "access_management",
+    **{t: "settings" for t in ("company", "branches", "departments", "tax_rates", "units", "financial_periods",
+                               "number_sequences")},
 }
 
