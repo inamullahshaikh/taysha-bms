@@ -141,6 +141,16 @@ def reset_password(user_id: int, body: PasswordReset, db: DB, actor: User = EDIT
     audit(db, "reset_password", entity_type="users", entity_id=u.id)
 
 
+@router.post("/users/{user_id}/reset-2fa", status_code=204)
+def reset_2fa(user_id: int, db: DB, actor: User = EDIT):
+    """For a user who lost their phone and recovery codes."""
+    u = get_user(db, user_id)
+    guard_target(actor, u)
+    u.totp_enabled, u.totp_secret, u.recovery_codes = False, None, None
+    end_all_sessions(db, u.id)
+    audit(db, "2fa_reset", entity_type="users", entity_id=u.id)
+
+
 @router.get("/users/{user_id}/access")
 def read_access(user_id: int, db: DB, _: User = VIEW) -> dict[str, list[str]]:
     return access_map(db, get_user(db, user_id))
