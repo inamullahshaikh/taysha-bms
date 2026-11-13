@@ -125,6 +125,7 @@ class Payment(Entity, Base):
     status: Mapped[str] = mapped_column(String(10), default="completed")  # completed | failed
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    invoice_id: Mapped[int | None] = mapped_column(ForeignKey("sales_documents.id"), index=True)
     payment_date: Mapped[date] = mapped_column(Date)
     method: Mapped[str] = mapped_column(String(20))
     amount: Mapped[Money]  # always positive

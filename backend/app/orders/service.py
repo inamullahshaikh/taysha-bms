@@ -230,6 +230,9 @@ def refresh_payment_status(db: Session, order: Order) -> None:
         order.payment_status = "failed"
     else:
         order.payment_status = "unpaid"
+    from app.documents.service import refresh_invoices_for_order  # documents depend on orders, not the reverse
+
+    refresh_invoices_for_order(db, order.id)
 
 
 def ensure_editable(order: Order) -> None:

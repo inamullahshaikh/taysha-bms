@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}
+<h1>{{ title }}</h1>
+<div>{{ d.number or "DRAFT" }}</div>
+<div>{{ d.doc_date|date }}</div>
+{% if d.due_date and d.doc_type in ("invoice", "debit_note") %}<div>Due {{ d.due_date|date }}</div>{% endif %}
+{% if d.valid_until %}<div>Valid until {{ d.valid_until|date }}</div>{% endif %}
+{% endblock %}
+{% block body %}
+{% if d.status == "cancelled" %}<div class="box" style="color:#b00;border-color:#b00"><b>CANCELLED</b>{% if d.cancelled_reason %}: {{ d.cancelled_reason }}{% endif %}</div>{% endif %}
+<div class="cols">
+  <div><div class="label">{{ "Received from" if d.doc_type == "receipt" else "Bill to" }}</div>
+    <b>{{ d.customer_name or "Walk-in customer" }}</b><br>
+    {% if d.billing_address %}{{ d.billing_address|address }}<br>{% endif %}
+    {{ d.customer_phone or "" }}{% if d.customer_email %} · {{ d.customer_email }}{% endif %}
+    {% if d.customer_ntn %}<br>NTN {{ d.customer_ntn }}{% endif %}{% if d.customer_strn %} · STRN {{ d.customer_strn }}{% endif %}
+  </div>
+  {% if d.shipping_address and d.doc_type != "receipt" %}
+  <div><div class="label">Deliver to</div>{{ d.shipping_address|address }}</div>
+  {% endif %}
+  {% if related %}
+  <div><div class="label">Against</div>{{ related.number }} ({{ related.doc_date|date }})</div>
+  {% endif %}
+</div>
+
+{% if d.doc_type == "receipt" %}
+<table class="totals" style="width:100%">
+  <tr><td>Payment method</td><td class="num">{{ payment.method|label if payment else "" }}</td></tr>
+  {% if payment and payment.reference %}<tr><td>Reference</td><td class="num">{{ payment.reference }}</td></tr>{% endif %}
+  <tr class="grand"><td>Amount received (PKR)</td><td class="num">{{ d.grand_total|money }}</td></tr>
+</table>
+{% elif d.doc_type == "delivery_challan" %}
+<table>
+  <tr><th>#</th><th>Item</th><th>SKU</th><th class="num">Qty</th></tr>
+  {% for l in lines %}
+  <tr><td>{{ l.line_no }}</td><td>{{ l.description }}</td><td>{{ l.sku or "" }}</td><td class="num">{{ l.quantity|qty }}</td></tr>
+  {% endfor %}
+</table>
+<div class="footer">Received in good condition by: ____________________ &nbsp;&nbsp; Date: ____________</div>
+{% else %}
+<table>
+  <tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Discount</th>
+      <th class="num">Excl. tax</th><th class="num">Tax</th><th class="num">Amount</th></tr>
+  {% for l in lines %}
+  <tr><td>{{ l.line_no }}</td><td>{{ l.description }}{% if l.sku %}<br><span class="muted">{{ l.sku }}</span>{% endif %}</td>
+      <td class="num">{{ l.quantity|qty }}</td><td class="num">{{ l.unit_price|money }}</td>
+      <td class="num">{{ (l.line_discount + l.order_discount_share)|money if (l.line_discount + l.order_discount_share) else "" }}</td>
+      <td class="num">{{ l.net_amount|money }}</td>
+      <td class="num">{{ l.tax_amount|money }}<br><span class="muted">{{ l.tax_rate|qty }}%</span></td>
+      <td class="num">{{ l.line_total|money }}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr><td>Subtotal</td><td class="num">{{ d.subtotal|money }}</td></tr>
+  {% if d.discount_total %}<tr><td>Discounts</td><td class="num">-{{ d.discount_total|money }}</td></tr>{% endif %}
+  <tr><td class="muted">Value excl. sales tax</td><td class="num muted">{{ d.net_total|money }}</td></tr>
+  <tr><td class="muted">Sales tax</td><td class="num muted">{{ d.tax_total|money }}</td></tr>
+  {% if d.delivery_charge %}<tr><td>Delivery</td><td class="num">{{ d.delivery_charge|money }}</td></tr>{% endif %}
+  {% for c in d.other_charges %}<tr><td>{{ c.label }}</td><td class="num">{{ c.amount|money }}</td></tr>{% endfor %}
+  {% if d.rounding %}<tr><td>Rounding</td><td class="num">{{ d.rounding|money }}</td></tr>{% endif %}
+  <tr class="grand"><td>Total (PKR)</td><td class="num">{{ d.grand_total|money }}</td></tr>
+  {% if d.doc_type == "invoice" and d.status != "draft" %}
+    {% if d.paid_total %}<tr><td>Paid</td><td class="num">{{ d.paid_total|money }}</td></tr>{% endif %}
+    {% if d.credited_total %}<tr><td>Credited</td><td class="num">{{ d.credited_total|money }}</td></tr>{% endif %}
+    <tr><td><b>Balance due</b></td><td class="num"><b>{{ (d.grand_total - d.paid_total - d.credited_total)|money }}</b></td></tr>
+  {% endif %}
+</table>
+{% endif %}
+{% if d.notes %}<div class="box"><div class="label">Notes</div>{{ d.notes }}</div>{% endif %}
+{% if d.doc_type in ("invoice", "proforma", "quotation") and company.bank_details %}<div class="box"><div class="label">Bank details</div><div style="white-space: pre-line">{{ company.bank_details }}</div></div>{% endif %}
+{% if d.terms %}<div class="footer">{{ d.terms }}</div>{% endif %}
+{% endblock %}
