@@ -25,7 +25,7 @@ from app.numbering import next_number
 from app.company import get_company
 from app.orders.calc import LineCalc, calculate
 from app.orders.models import Order, OrderLine, OrderStatusHistory, Payment
-from app.orders.router import AddressIn, PaymentIn, PaymentOut, PaymentMethod
+from app.orders.router import AddressIn, PaymentIn, PaymentOut
 from app.orders.service import refresh_payment_status
 from app.pdf import pdf_response, render_pdf
 

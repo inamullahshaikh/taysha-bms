@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}<h1>STATEMENT</h1><div>{{ st["from"]|date }} – {{ st["to"]|date }}</div>{% endblock %}
+{% block body %}
+<div class="cols">
+  <div><div class="label">Customer</div><b>{{ customer.company_name or customer.name }}</b><br>{{ customer.phone or "" }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+  <div><div class="label">Balance due</div><b style="font-size:13pt">Rs {{ st.closing_balance|money }}</b></div>
+</div>
+<table>
+  <tr><th>Date</th><th>Type</th><th>Reference</th><th>Due</th><th class="num">Amount</th><th class="num">Balance</th></tr>
+  <tr><td>{{ st["from"]|date }}</td><td colspan="4">Opening balance</td><td class="num">{{ st.opening_balance|money }}</td></tr>
+  {% for l in st.lines %}
+  <tr><td>{{ l.date|date }}</td><td>{{ l.type|label }}</td><td>{{ l.reference }}</td><td>{{ l.due_date|date }}</td>
+      <td class="num">{{ l.amount|money }}</td><td class="num">{{ l.balance|money }}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr class="grand"><td>Closing balance</td><td class="num">{{ st.closing_balance|money }}</td></tr>
+</table>
+{% if company.bank_details %}<div class="box"><div class="label">Bank details</div><div style="white-space: pre-line">{{ company.bank_details }}</div></div>{% endif %}
+{% endblock %}

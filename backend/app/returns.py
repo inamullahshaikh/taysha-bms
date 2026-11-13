@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, Text, func, select
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.audit import audit, snapshot

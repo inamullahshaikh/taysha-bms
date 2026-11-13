@@ -28,6 +28,7 @@ from app.documents.models import SalesDocument
 from app.errors import AppError
 from app.expenses import Expense, ExpenseCategory
 from app.listing import export_response
+from app.inventory.models import StockMovement
 from app.orders.models import Order, OrderLine, Payment
 from app.pdf import pdf_response, render_pdf
 from app.products.models import Product
@@ -223,11 +224,85 @@ def customer_metrics(db: Session, start: date, end: date) -> dict:
             "overdue": db.scalar(open_inv.where(SalesDocument.status == "overdue"))}
 
 
+def inventory_metrics(db: Session, start: date, end: date, show_value: bool) -> dict:
+    from app.inventory.models import Batch, ProductStockCost, ReorderRule, StockBalance, StockReservation, Transfer
+    from app.inventory.models import TransferLine
+    from app.inventory.service import available, on_hand
+
+    t = local_today()
+    stocked = select(Product.id).where(Product.track_stock, Product.kind != "bundle", Product.archived_at.is_(None))
+    total_qty = db.scalar(select(func.coalesce(func.sum(StockBalance.quantity), 0)))
+    low = out = over = short_materials = 0
+    for r, ptype in db.execute(select(ReorderRule, Product.type).join(Product, Product.id == ReorderRule.product_id)):
+        oh, av = on_hand(db, r.product_id, r.warehouse_id), available(db, r.product_id, r.warehouse_id)
+        is_out = oh <= 0
+        is_low = not is_out and r.reorder_point is not None and av <= r.reorder_point
+        out, low = out + is_out, low + is_low
+        over += r.max_qty is not None and oh > r.max_qty
+        short_materials += ptype in ("raw", "packaging") and (is_out or is_low)
+    batch_qty = (select(Batch.id, Batch.expiry_date, Batch.status, func.sum(StockBalance.quantity).label("q"))
+                 .join(StockBalance, StockBalance.batch_id == Batch.id).group_by(Batch.id)
+                 .having(func.sum(StockBalance.quantity) > 0).subquery())
+    expiring = db.scalar(select(func.count()).select_from(batch_qty).where(
+        batch_qty.c.expiry_date.between(t, t + timedelta(days=14))))
+    expired = db.scalar(select(func.count()).select_from(batch_qty).where(batch_qty.c.expiry_date < t))
+    held = db.scalar(select(func.coalesce(func.sum(batch_qty.c.q), 0)).where(batch_qty.c.status.in_(("hold",))))
+    rejected = db.scalar(select(func.coalesce(func.sum(batch_qty.c.q), 0)).where(batch_qty.c.status == "rejected"))
+    out_d = {
+        "total_products": db.scalar(select(func.count()).select_from(stocked.subquery())),
+        "total_stock_quantity": total_qty, "low_stock": low, "out_of_stock": out, "overstock": over,
+        "materials_short": short_materials,
+        "reserved_quantity": db.scalar(select(func.coalesce(func.sum(StockReservation.quantity), 0))),
+        "in_transit_quantity": db.scalar(select(func.coalesce(func.sum(TransferLine.quantity), 0)).join(Transfer)
+                                         .where(Transfer.status == "in_transit")),
+        "expiring_batches": expiring, "expired_batches_with_stock": expired,
+        "held_quantity": held, "rejected_quantity": rejected,
+        "damaged_or_wasted_quantity": db.scalar(select(func.coalesce(-func.sum(StockMovement.quantity), 0)).where(
+            StockMovement.reason.in_(("damage", "wastage", "expired")), StockMovement.movement_date.between(start, end))),
+    }
+    if show_value:
+        value = money(db.scalar(select(func.coalesce(func.sum(StockBalance.quantity * ProductStockCost.avg_cost), 0))
+                                .join(ProductStockCost, ProductStockCost.product_id == StockBalance.product_id)))
+        days = (end - start).days + 1
+        c = cogs(db, start, end)
+        out_d["valuation"] = value
+        out_d["turnover_annualised"] = (c / value * Decimal(365) / days).quantize(Decimal("0.1")) if value else None
+    return out_d
+
+
+def purchasing_metrics(db: Session, user: User, start: date, end: date) -> dict:
+    from app.purchasing.models import PurchaseOrder, SupplierBill
+    from app.purchasing.router import price_changes
+    from app.suppliers import Supplier
+
+    recent = local_today() - timedelta(days=90)
+    out = {
+        "total_suppliers": db.scalar(select(func.count()).select_from(Supplier).where(Supplier.archived_at.is_(None))),
+        "active_suppliers": db.scalar(select(func.count(func.distinct(PurchaseOrder.supplier_id))).where(
+            PurchaseOrder.order_date >= recent, PurchaseOrder.status != "cancelled")),
+        "purchases": db.scalar(select(func.coalesce(func.sum(PurchaseOrder.grand_total), 0)).where(
+            PurchaseOrder.order_date.between(start, end), PurchaseOrder.status.not_in(("cancelled", "draft")))),
+        "pending_approval": db.scalar(select(func.count()).select_from(PurchaseOrder).where(
+            PurchaseOrder.status == "requested")),
+        "awaiting_delivery": db.scalar(select(func.count()).select_from(PurchaseOrder).where(
+            PurchaseOrder.status.in_(("approved", "ordered", "partially_received")))),
+        "price_changes_30d": len(price_changes(db, 30)),
+    }
+    if can(db, user, "supplier_bills", "view"):
+        open_bills = select(func.coalesce(func.sum(SupplierBill.grand_total - SupplierBill.withholding_tax
+                                                   - SupplierBill.paid_total), 0))
+        out["outstanding_payables"] = db.scalar(open_bills.where(
+            SupplierBill.status.in_(("unpaid", "partially_paid", "overdue"))))
+        out["overdue_payables"] = db.scalar(open_bills.where(SupplierBill.status == "overdue"))
+    return out
+
+
 # ---------- dashboard ----------
 
 dashboard = APIRouter(prefix="/dashboard", tags=["dashboard"])
 DEFAULT_WIDGETS = ["sales_summary", "order_status", "sales_trend", "sales_by_channel", "top_products",
-                   "profit_summary", "expenses_summary", "customers_summary", "receivables"]
+                   "profit_summary", "expenses_summary", "customers_summary", "receivables", "inventory_summary",
+                   "stock_alerts", "purchasing_summary"]
 
 
 @dashboard.get("")
@@ -265,6 +340,10 @@ def get_dashboard(user: CurrentUser, db: DB, range: Range = "month", date_from: 
                 Expense.status == "submitted"))}
     if can(db, user, "customers", "view"):
         out["customers"] = customer_metrics(db, start, end)
+    if can(db, user, "inventory", "view"):
+        out["inventory"] = inventory_metrics(db, start, end, can(db, user, "product_costs", "view"))
+    if can(db, user, "purchasing", "view"):
+        out["purchasing"] = purchasing_metrics(db, user, start, end)
     if can(db, user, "orders", "view"):
         out["trend"] = monthly_trend(db) if can(db, user, "product_costs", "view") else [
             {k: v for k, v in m.items() if k in ("month", "revenue", "net_sales")} for m in monthly_trend(db)]

@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.audit import audit
-from app.auth.access import can, require_access
+from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
 from app.company import get_company
