@@ -6,7 +6,7 @@ from decimal import Decimal
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Boolean, Date, Index, Numeric, String, Text, select, update
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Numeric, String, Text, select, update
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.attachments import ALLOWED_TYPES, read_file, store
@@ -44,6 +44,8 @@ class Company(Entity, Base):
     logo_content_type: Mapped[str | None] = mapped_column(String(100))
     brand_color: Mapped[str | None] = mapped_column(String(7))  # e.g. #8B4513
     expense_approval_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # above this: owner approves
+    purchase_approval_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    default_warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id", use_alter=True))
 
 
 class Branch(Entity, Base):
@@ -121,6 +123,8 @@ class CompanyIn(BaseModel):
     invoice_terms: str | None = None
     brand_color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     expense_approval_limit: Decimal | None = Field(None, ge=0)
+    purchase_approval_limit: Decimal | None = Field(None, ge=0)
+    default_warehouse_id: int | None = None
 
 
 class CompanyOut(CompanyIn):

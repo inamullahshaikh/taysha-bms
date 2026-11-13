@@ -45,7 +45,10 @@ class Order(Entity, Base):
     external_id: Mapped[str | None] = mapped_column(String(100))
     price_list_id: Mapped[int | None] = mapped_column(ForeignKey("price_lists.id"))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
+    warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"))
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    fulfilment_status: Mapped[str] = mapped_column(String(20), default="unfulfilled",
+                                                   server_default="unfulfilled")  # unfulfilled|partial|fulfilled
     payment_status: Mapped[str] = mapped_column(String(20), default="unpaid", index=True)
     payment_method: Mapped[str | None] = mapped_column(String(20))
     delivery_method: Mapped[str] = mapped_column(String(20), default="delivery")  # delivery | pickup
@@ -99,7 +102,9 @@ class OrderLine(Base):
     tax_amount: Mapped[Money]
     net_amount: Mapped[Money]
     line_total: Mapped[Money]  # incl. tax, after all discounts
-    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))  # cost snapshot for profit reports
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))  # standard cost, then actual once shipped
+    cost_from_stock: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    shipped_qty: Mapped[Qty] = mapped_column(default=Decimal(0), server_default="0")
 
 
 class OrderStatusHistory(Base):
@@ -145,3 +150,26 @@ class DiscountCode(Entity, Base):
     min_order_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     max_uses: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Shipment(Entity, Base):
+    __tablename__ = "shipments"
+
+    number: Mapped[str] = mapped_column(String(30), unique=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"))
+    status: Mapped[str] = mapped_column(String(20), default="dispatched")  # dispatched | delivered | returned
+    courier: Mapped[str | None] = mapped_column(String(80))
+    tracking_number: Mapped[str | None] = mapped_column(String(100))
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    proof_of_delivery_id: Mapped[int | None] = mapped_column(BigInteger)  # attachment id
+
+
+class ShipmentLine(Base):
+    __tablename__ = "shipment_lines"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    shipment_id: Mapped[int] = mapped_column(ForeignKey("shipments.id", ondelete="CASCADE"), index=True)
+    order_line_id: Mapped[int] = mapped_column(ForeignKey("order_lines.id"))
+    quantity: Mapped[Qty]

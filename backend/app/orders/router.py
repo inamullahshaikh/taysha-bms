@@ -18,9 +18,9 @@ from app.errors import AppError
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
 from app.numbering import next_number
 from app.pdf import pdf_response, render_pdf
-from app.orders.models import DiscountCode, Order, OrderLine, OrderStatusHistory, Payment
+from app.orders.models import DiscountCode, Order, OrderLine, OrderStatusHistory, Payment, Shipment, ShipmentLine
 from app.orders.service import (
-    LOCKED, apply_priced, change_status, ensure_editable, price_order, refresh_payment_status,
+    LOCKED, apply_priced, change_status, create_shipment, ensure_editable, price_order, refresh_payment_status,
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -65,6 +65,7 @@ class OrderIn(BaseModel):
     channel: str | None = None
     price_list_id: int | None = None
     branch_id: int | None = None
+    warehouse_id: int | None = None
     payment_method: PaymentMethod | None = None
     delivery_method: Literal["delivery", "pickup"] = "delivery"
     shipping_address_id: int | None = None
@@ -108,6 +109,9 @@ class LineOut(BaseModel):
     tax_amount: Decimal
     net_amount: Decimal
     line_total: Decimal
+    shipped_qty: Decimal = Decimal(0)
+    reserved_qty: Decimal | None = None  # in line units
+    backorder_qty: Decimal | None = None
 
 
 class OrderSummary(RecordOut):
@@ -121,6 +125,7 @@ class OrderSummary(RecordOut):
     source: str
     status: str
     payment_status: str
+    fulfilment_status: str
     payment_method: str | None
     grand_total: Decimal
     paid_total: Decimal
@@ -142,6 +147,7 @@ class HistoryOut(BaseModel):
 class OrderOut(OrderSummary):
     price_list_id: int | None
     branch_id: int | None
+    warehouse_id: int | None
     delivery_method: str
     shipping_address: dict | None
     billing_address: dict | None
@@ -215,9 +221,16 @@ def get_order(db: Session, order_id: int) -> Order:
 
 
 def order_out(db: Session, o: Order) -> OrderOut:
+    from app.inventory.service import line_backorder
+
     out = OrderOut.model_validate(o)
-    out.lines = [LineOut.model_validate(x) for x in db.scalars(
-        select(OrderLine).where(OrderLine.order_id == o.id).order_by(OrderLine.line_no))]
+    out.lines = []
+    for x in db.scalars(select(OrderLine).where(OrderLine.order_id == o.id).order_by(OrderLine.line_no)):
+        lo = LineOut.model_validate(x)
+        if o.status in ("confirmed", "processing", "packed") and o.warehouse_id:
+            lo.backorder_qty = line_backorder(db, x)
+            lo.reserved_qty = x.quantity - x.shipped_qty - lo.backorder_qty
+        out.lines.append(lo)
     out.history = [HistoryOut.model_validate(h) for h in db.scalars(
         select(OrderStatusHistory).where(OrderStatusHistory.order_id == o.id).order_by(OrderStatusHistory.id))]
     return out
@@ -384,6 +397,65 @@ def update_delivery(order_id: int, body: DeliveryIn, db: DB, _: User = EDIT):
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(o, k, v)
     audit(db, "update", o, before=before)
+    return order_out(db, o)
+
+
+# ---------- shipments ----------
+
+class ShipLineIn(BaseModel):
+    order_line_id: int
+    quantity: Decimal = Field(gt=0)
+
+
+class ShipmentIn(BaseModel):
+    lines: list[ShipLineIn] = Field(min_length=1)
+    courier: str | None = None
+    tracking_number: str | None = None
+
+
+class ShipmentOut(RecordOut):
+    number: str
+    order_id: int
+    warehouse_id: int | None
+    status: str
+    courier: str | None
+    tracking_number: str | None
+    dispatched_at: datetime | None
+    delivered_at: datetime | None
+    lines: list[dict] = []
+
+
+@router.get("/{order_id}/shipments", response_model=list[ShipmentOut])
+def list_shipments(order_id: int, db: DB, _: User = VIEW):
+    get_order(db, order_id)
+    out = []
+    for sh in db.scalars(select(Shipment).where(Shipment.order_id == order_id).order_by(Shipment.id)):
+        so = ShipmentOut.model_validate(sh)
+        so.lines = [{"order_line_id": ln.order_line_id, "quantity": ln.quantity}
+                    for ln in db.scalars(select(ShipmentLine).where(ShipmentLine.shipment_id == sh.id))]
+        out.append(so)
+    return out
+
+
+@router.post("/{order_id}/shipments", response_model=OrderOut, status_code=201)
+def ship_partial(order_id: int, body: ShipmentIn, db: DB, _: User = EDIT):
+    """Partial fulfilment / split shipment. When everything has shipped the order becomes dispatched."""
+    o = get_order(db, order_id)
+    if o.status not in ("confirmed", "processing", "packed"):
+        raise AppError(409, "not_shippable", f"Can't ship an order that is {o.status}")
+    courier = body.courier or o.courier
+    if o.delivery_method == "delivery" and not courier:
+        raise AppError(422, "courier_required", "Add the courier", {"courier": "required"})
+    qty: dict[int, Decimal] = {}
+    for ln in body.lines:
+        qty[ln.order_line_id] = qty.get(ln.order_line_id, ZERO) + ln.quantity
+    create_shipment(db, o, qty, courier, body.tracking_number)
+    o.courier = o.courier or courier
+    o.tracking_number = o.tracking_number or body.tracking_number
+    if o.fulfilment_status == "fulfilled":
+        change_status(db, o, "dispatched", "all items shipped")
+    elif o.status == "confirmed":
+        change_status(db, o, "processing", "partly shipped")
     return order_out(db, o)
 
 

@@ -13,7 +13,9 @@ from app.clock import local_today, utcnow
 from app.customers import Customer, CustomerAddress
 from app.errors import AppError, not_found
 from app.orders.calc import LineCalc, Totals, calculate
-from app.orders.models import TRANSITIONS, DiscountCode, Order, OrderLine, OrderStatusHistory, Payment
+from app.orders.models import (
+    TRANSITIONS, DiscountCode, Order, OrderLine, OrderStatusHistory, Payment, Shipment, ShipmentLine,
+)
 from app.products.models import PriceList, Product, SalesChannel
 from app.products.pricing import current_cost, resolve_price, tax_rate_of
 
@@ -146,6 +148,7 @@ def apply_priced(db: Session, order: Order, body, priced: dict) -> None:
     order.channel = body.channel
     order.price_list_id = priced["price_list"].id if priced["price_list"] else None
     order.branch_id = body.branch_id
+    order.warehouse_id = body.warehouse_id or order.warehouse_id
     order.payment_method = body.payment_method
     order.delivery_method = body.delivery_method
     order.shipping_address = address_snapshot(db, c, body.shipping_address_id, body.shipping_address, "shipping")
@@ -172,6 +175,8 @@ def apply_priced(db: Session, order: Order, body, priced: dict) -> None:
 
 
 def change_status(db: Session, order: Order, to: str, note: str | None = None) -> None:
+    from app.inventory import service as stock  # inventory depends on orders' tables; import lazily
+
     if to not in TRANSITIONS.get(order.status, ()):
         raise AppError(409, "invalid_transition", f"An order can't go from {order.status} to {to}",
                        {"status": f"allowed: {', '.join(TRANSITIONS[order.status]) or 'none'}"})
@@ -179,24 +184,54 @@ def change_status(db: Session, order: Order, to: str, note: str | None = None) -
         raise AppError(422, "courier_required", "Add the courier before dispatching", {"courier": "required"})
     if to == "cancelled" and not note:
         raise AppError(422, "reason_required", "Give a reason for cancelling", {"note": "required"})
+    lines = db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)).all()
+    if to in ("cancelled", "draft") and any(ln.shipped_qty for ln in lines):
+        raise AppError(409, "already_shipped", "Part of this order has shipped; use a return instead")
     frm = order.status
-    order.status = to
     now = utcnow()
     if to == "confirmed":
         order.confirmed_at = now
         snapshot_costs(db, order)
-    elif to == "dispatched":
-        order.dispatched_at = now
-    elif to == "delivered":
-        order.delivered_at = now
+        stock.reserve_order(db, order)
+    elif to in ("draft", "cancelled"):
+        stock.release_order(db, order)
+    elif to in ("dispatched", "delivered"):
+        remaining = {ln.id: ln.quantity - ln.shipped_qty for ln in lines if ln.quantity > ln.shipped_qty}
+        if remaining:  # ship whatever hasn't gone out yet as one shipment
+            create_shipment(db, order, remaining, order.courier, order.tracking_number)
         order.dispatched_at = order.dispatched_at or now
-    elif to == "cancelled":
+        if to == "delivered":
+            order.delivered_at = now
+            for sh in db.scalars(select(Shipment).where(Shipment.order_id == order.id, Shipment.status == "dispatched")):
+                sh.status, sh.delivered_at = "delivered", now
+    if to == "cancelled":
         order.cancelled_reason = note
+    order.status = to
     db.add(OrderStatusHistory(order_id=order.id, from_status=frm, to_status=to, user_id=db.info.get("user_id"),
                               note=note))
     audit(db, "status", entity_type="orders", entity_id=order.id, before={"status": frm}, after={"status": to},
           note=note)
     refresh_payment_status(db, order)
+
+
+def create_shipment(db: Session, order: Order, quantities: dict[int, Decimal], courier: str | None,
+                    tracking: str | None) -> Shipment:
+    """Ship some or all remaining quantities. Stock is issued here (reservations first)."""
+    from app.inventory import service as stock
+    from app.numbering import next_number
+
+    sh = Shipment(number=next_number(db, "shipment"), order_id=order.id, warehouse_id=stock.order_warehouse(db, order),
+                  courier=courier, tracking_number=tracking, dispatched_at=utcnow())
+    db.add(sh)
+    db.flush()
+    stock.ship_lines(db, order, quantities, ("shipment", sh.id, sh.number))
+    db.add_all(ShipmentLine(shipment_id=sh.id, order_line_id=lid, quantity=q) for lid, q in quantities.items())
+    lines = db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)).all()
+    shipped = [ln.shipped_qty >= ln.quantity for ln in lines]
+    order.fulfilment_status = "fulfilled" if all(shipped) else "partial"
+    audit(db, "ship", entity_type="orders", entity_id=order.id, note=sh.number,
+          after={str(k): str(v) for k, v in quantities.items()})
+    return sh
 
 
 def snapshot_costs(db: Session, order: Order) -> None:

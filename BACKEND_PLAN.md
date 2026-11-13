@@ -29,7 +29,9 @@ Feature list: [FEATURES_AND_TODO.md](FEATURES_AND_TODO.md) · Frontend tickets: 
 | Tax | Selling prices are **tax-inclusive**; tax is extracted from line totals |
 | Delivery charges | Untaxed |
 | Rounding | Lines keep paisa; order/invoice grand total rounded to whole rupees with a rounding line |
-| Costing | Weighted average cost |
+| Costing | Weighted average cost (company-wide per product) |
+| Short stock on confirm | Order confirms; available stock reserved, rest marked backorder; short lines can't ship |
+| Purchase approval | Like expenses: approver ≠ creator, owner needed above company limit |
 | Timezone | Asia/Karachi for "today / this month" |
 | Git | One commit per ticket |
 

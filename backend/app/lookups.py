@@ -7,6 +7,7 @@ from app.auth.deps import CurrentUser
 from app.company import Branch, Department, TaxRate, Unit
 from app.db import DB
 from app.expenses import CostCentre, ExpenseCategory
+from app.inventory.models import Warehouse
 from app.products.models import PriceList, ProductCategory, SalesChannel
 
 router = APIRouter(tags=["lookups"])
@@ -29,6 +30,7 @@ def lookups(_: CurrentUser, db: DB):
         "product_categories": _rows(db, ProductCategory, "name", "parent_id"),
         "expense_categories": _rows(db, ExpenseCategory, "name", "parent_id"),
         "cost_centres": _rows(db, CostCentre, "code", "name"),
+        "warehouses": _rows(db, Warehouse, "code", "name"),
     }
 
 routers = [router]

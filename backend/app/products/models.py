@@ -49,6 +49,7 @@ class Product(Entity, Base):
     variant_attributes: Mapped[dict | None] = mapped_column(JSONB)  # {"size": "250 g"}
     tax_rate_id: Mapped[int | None] = mapped_column(ForeignKey("tax_rates.id"))  # null = company default
     channels: Mapped[list] = mapped_column(JSONB, default=list)  # sales channel codes it's sold on
+    track_stock: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     track_batches: Mapped[bool] = mapped_column(Boolean, default=True)
     shelf_life_days: Mapped[int | None] = mapped_column(Integer)
     launch_date: Mapped[date | None] = mapped_column(Date)

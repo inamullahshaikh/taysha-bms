@@ -46,6 +46,7 @@ class ProductFields(BaseModel):
     variant_attributes: dict[str, str] | None = None
     tax_rate_id: int | None = None
     channels: list[str] = []
+    track_stock: bool = True
     track_batches: bool = True
     shelf_life_days: int | None = Field(None, ge=0)
     launch_date: date | None = None
@@ -71,6 +72,7 @@ class ProductPatch(BaseModel):
     variant_attributes: dict[str, str] | None = None
     tax_rate_id: int | None = None
     channels: list[str] | None = None
+    track_stock: bool | None = None
     track_batches: bool | None = None
     shelf_life_days: int | None = Field(None, ge=0)
     launch_date: date | None = None
