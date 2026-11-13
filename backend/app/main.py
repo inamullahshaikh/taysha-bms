@@ -12,6 +12,7 @@ from app.documents import router as documents
 from app.inventory import router as inventory
 from app.orders import router as orders
 from app.products import router as products
+from app.purchasing import router as purchasing
 
 # Money must never become a float in JSON: plain-dict responses get Decimal -> "1200.00" like pydantic models do
 encoders.ENCODERS_BY_TYPE[Decimal] = str
@@ -32,7 +33,7 @@ app.add_middleware(
 errors.install(app)
 
 MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
-           suppliers, orders, documents, jobs, expenses, reports, backup, inventory)
+           suppliers, orders, documents, jobs, expenses, reports, backup, inventory, purchasing)
 for module in MODULES:
     for r in module.routers:
         app.include_router(r)

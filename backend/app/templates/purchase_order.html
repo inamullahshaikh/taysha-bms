@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}<h1>PURCHASE ORDER</h1><div>{{ po.number }}</div><div>{{ po.order_date|date }}</div>
+{% if po.expected_date %}<div>Needed by {{ po.expected_date|date }}</div>{% endif %}{% endblock %}
+{% block body %}
+<div class="cols">
+  <div><div class="label">Supplier</div><b>{{ supplier.name }}</b><br>
+    {% if supplier.address %}{{ supplier.address }}<br>{% endif %}{{ supplier.phone or "" }}{% if supplier.email %} · {{ supplier.email }}{% endif %}
+    {% if supplier.ntn %}<br>NTN {{ supplier.ntn }}{% endif %}</div>
+  <div><div class="label">Deliver to</div>{% if warehouse %}{{ warehouse.name }}<br>{{ warehouse.address or company.address or "" }}{% else %}{{ company.address or "" }}{% endif %}</div>
+  <div><div class="label">Status</div>{{ po.status|label }}{% if supplier.payment_terms_days %}<br>Payment: {{ supplier.payment_terms_days }} days{% endif %}</div>
+</div>
+<table>
+  <tr><th>#</th><th>Item</th><th class="num">Qty</th><th>Unit</th><th class="num">Unit cost</th><th class="num">Tax</th><th class="num">Amount</th></tr>
+  {% for l in lines %}
+  <tr><td>{{ l.line_no }}</td><td>{{ l.description }}</td><td class="num">{{ l.quantity|qty }}</td><td>{{ l.unit or "" }}</td>
+      <td class="num">{{ l.unit_cost|money }}</td><td class="num">{{ l.tax_amount|money }}<br><span class="muted">{{ l.tax_rate|qty }}%</span></td>
+      <td class="num">{{ l.line_total|money }}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr><td>Subtotal</td><td class="num">{{ po.subtotal|money }}</td></tr>
+  <tr><td>Tax</td><td class="num">{{ po.tax_total|money }}</td></tr>
+  <tr class="grand"><td>Total (PKR)</td><td class="num">{{ po.grand_total|money }}</td></tr>
+</table>
+{% if po.notes %}<div class="box"><div class="label">Notes</div>{{ po.notes }}</div>{% endif %}
+{% if po.terms %}<div class="footer">{{ po.terms }}</div>{% endif %}
+<div class="footer">Authorised by: ____________________</div>
+{% endblock %}

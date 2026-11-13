@@ -37,6 +37,12 @@ def _overdue_invoices(db: Session) -> str:
     return f"{mark_overdue(db)} invoices checked"
 
 
+def _overdue_bills(db: Session) -> str:
+    from app.purchasing.router import mark_overdue_bills
+
+    return f"{mark_overdue_bills(db)} supplier bills checked"
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -52,6 +58,7 @@ def _restore_check(db: Session) -> str:
 # name -> (interval, function(db) -> message). Modules add their jobs here.
 JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "overdue_invoices": (timedelta(hours=1), _overdue_invoices),
+    "overdue_supplier_bills": (timedelta(hours=1), _overdue_bills),
     "backup": (timedelta(days=1), _backup),
     "restore_check": (timedelta(days=7), _restore_check),
 }
