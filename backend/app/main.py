@@ -1,9 +1,15 @@
-from fastapi import FastAPI
+from decimal import Decimal
+
+from fastapi import FastAPI, encoders
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import attachments, audit_router, company, errors, models  # noqa: F401
+from app import attachments, audit_router, company, errors, lookups, models  # noqa: F401
 from app.auth import mfa_router, router as auth_router, users_router
 from app.config import settings
+from app.products import router as products
+
+# Money must never become a float in JSON: plain-dict responses get Decimal -> "1200.00" like pydantic models do
+encoders.ENCODERS_BY_TYPE[Decimal] = str
 
 app = FastAPI(title="Taysha BMS")
 app.add_middleware(
@@ -15,7 +21,8 @@ app.add_middleware(
 )
 errors.install(app)
 
-for module in (auth_router, mfa_router, users_router, audit_router, attachments, company):
+MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products)
+for module in MODULES:
     app.include_router(module.router)
     for r in getattr(module, "crud_routers", ()):
         app.include_router(r)
