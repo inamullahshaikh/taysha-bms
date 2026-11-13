@@ -6,11 +6,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app.auth.models import User
+from app.auth.security import hash_password
 from app.config import settings
 from app.db import get_db
 from app.main import app
 
 TEST_URL = settings.test_database_url
+settings.cookie_secure = False  # TestClient talks plain http
+PASSWORD = "password123"
+_HASH = hash_password(PASSWORD)  # hash once, argon2 is slow on purpose
 
 
 @pytest.fixture(scope="session")
@@ -58,3 +63,25 @@ def client(db):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def make_user(db):
+    def _make(email="user@example.com", owner=False, active=True, name="Test User"):
+        u = User(name=name, email=email, password_hash=_HASH, is_owner=owner, is_active=active)
+        db.add(u)
+        db.flush()
+        return u
+
+    return _make
+
+
+def login(client, email, password=PASSWORD):
+    return client.post("/auth/login", json={"email": email, "password": password})
+
+
+@pytest.fixture
+def owner_client(client, make_user):
+    make_user("owner@example.com", owner=True, name="Owner")
+    assert login(client, "owner@example.com").status_code == 200
+    return client
