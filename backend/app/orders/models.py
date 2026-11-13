@@ -76,6 +76,8 @@ class Order(Entity, Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_reason: Mapped[str | None] = mapped_column(Text)
     external_data: Mapped[dict | None] = mapped_column(JSONB)  # e.g. Shopify totals, gateway, fulfilment sync
+    pos_session_id: Mapped[int | None] = mapped_column(ForeignKey("pos_sessions.id"), index=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("pos_events.id"), index=True)
 
     @property
     def balance_due(self) -> Decimal:

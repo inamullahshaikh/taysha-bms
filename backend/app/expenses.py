@@ -46,6 +46,7 @@ class Expense(Entity, Base):
     department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("pos_events.id"), index=True)  # stall/event costs
     payee: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     amount: Mapped[Money]  # total paid, incl. tax
@@ -91,6 +92,7 @@ class ExpenseIn(BaseModel):
     department_id: int | None = None
     branch_id: int | None = None
     supplier_id: int | None = None
+    event_id: int | None = None
     payee: str | None = None
     description: str = Field(min_length=1)
     amount: Decimal = Field(gt=0, decimal_places=2)

@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 80mm 200mm; margin: 3mm; }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #000; }
+  .c { text-align: center; }
+  h1 { font-size: 11pt; margin: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 1px 0; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+  .big td { font-size: 10pt; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="c">
+  {% if logo %}<img src="{{ logo }}" style="max-height:14mm;max-width:50mm"><br>{% endif %}
+  <h1>{{ company.name }}</h1>
+  {% if event %}{{ event.name }}{% if event.location %}<br>{{ event.location }}{% endif %}<br>{% endif %}
+  {{ o.number }} · {{ o.created_at|date }}
+</div>
+<hr>
+<table>
+  {% for l in lines %}
+  <tr><td colspan="2">{{ l.description }}</td></tr>
+  <tr><td>{{ l.quantity|qty }} × {{ l.unit_price|money }}{% if l.line_discount %} (-{{ l.line_discount|money }}){% endif %}</td>
+      <td class="num">{{ l.line_total|money }}</td></tr>
+  {% endfor %}
+</table>
+<hr>
+<table>
+  {% if o.discount_total %}<tr><td>Discount</td><td class="num">-{{ o.discount_total|money }}</td></tr>{% endif %}
+  {% if o.rounding %}<tr><td>Rounding</td><td class="num">{{ o.rounding|money }}</td></tr>{% endif %}
+  <tr class="big"><td>TOTAL</td><td class="num">Rs {{ o.grand_total|money }}</td></tr>
+  <tr><td>Incl. sales tax</td><td class="num">{{ o.tax_total|money }}</td></tr>
+  {% for p in payments %}<tr><td>{{ p.method|label }}</td><td class="num">{{ p.amount|money }}</td></tr>{% endfor %}
+</table>
+<hr>
+<div class="c">Thank you!{% if company.phone %}<br>{{ company.phone }}{% endif %}{% if company.website %}<br>{{ company.website }}{% endif %}</div>
+</body>
+</html>
