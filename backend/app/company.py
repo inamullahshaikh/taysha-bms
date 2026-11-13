@@ -6,7 +6,7 @@ from decimal import Decimal
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Boolean, Date, ForeignKey, Index, Numeric, String, Text, select, update
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, Numeric, String, Text, select, update
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.attachments import ALLOWED_TYPES, read_file, store
@@ -49,6 +49,9 @@ class Company(Entity, Base):
     labour_rate_per_hour: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0), server_default="0")
     overhead_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal(0), server_default="0")
     production_requires_qc: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    loyalty_points_per_100: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=Decimal(1), server_default="1")
+    loyalty_point_value: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=Decimal(1), server_default="1")
+    referral_bonus_points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Branch(Entity, Base):
@@ -131,6 +134,9 @@ class CompanyIn(BaseModel):
     labour_rate_per_hour: Decimal | None = Field(None, ge=0)
     overhead_pct: Decimal | None = Field(None, ge=0, le=500)
     production_requires_qc: bool | None = None
+    loyalty_points_per_100: Decimal | None = Field(None, ge=0)
+    loyalty_point_value: Decimal | None = Field(None, ge=0)
+    referral_bonus_points: int | None = Field(None, ge=0)
 
 
 class CompanyOut(CompanyIn):

@@ -38,6 +38,7 @@ KINDS: dict[str, tuple[str, str, str]] = {
     "delayed_dispatch": ("Order not dispatched", "orders", "view"),
     "unusual_adjustment": ("Large stock write-off or adjustment", "inventory", "view"),
     "failed_sync": ("Integration sync failed", "settings", "view"),
+    "follow_up": ("Customer follow-up due", "customers", "view"),
 }
 EXPIRY_WARNING_DAYS = 14
 DISPATCH_DELAY_DAYS = 2
@@ -199,6 +200,22 @@ def check_alerts(db: Session) -> str:
             sent += raise_alert(db, "unusual_adjustment", str(m.id),
                                 f"{m.reason.title()} of {p.name}: {m.quantity.normalize():f} (~Rs {value:,.0f})",
                                 m.note, f"/stock/movements?product_id={p.id}")
+
+    # follow-ups go to the person they're assigned to
+    from app.crm import FollowUp
+
+    for f in db.scalars(select(FollowUp).where(FollowUp.done_at.is_(None), FollowUp.due_date <= t,
+                                               FollowUp.archived_at.is_(None))):
+        found["follow_up"].add(str(f.id))
+        st = db.get(AlertState, f"follow_up:{f.id}")
+        if not (st and st.active) and f.assigned_to_id and prefs(db, f.assigned_to_id)["follow_up"]["in_app"]:
+            if st is None:
+                db.add(AlertState(key=f"follow_up:{f.id}", kind="follow_up", active=True, last_sent_at=utcnow()))
+            else:
+                st.active = True
+            db.add(Notification(user_id=f.assigned_to_id, kind="follow_up", title=f"Follow-up due: {f.note[:80]}",
+                                link=f"/customers/{f.customer_id}" if f.customer_id else f"/leads/{f.lead_id}"))
+            sent += 1
 
     # integration failures not yet resolved
     from app.integrations.shopify import SyncLog

@@ -78,6 +78,9 @@ class Order(Entity, Base):
     external_data: Mapped[dict | None] = mapped_column(JSONB)  # e.g. Shopify totals, gateway, fulfilment sync
     pos_session_id: Mapped[int | None] = mapped_column(ForeignKey("pos_sessions.id"), index=True)
     event_id: Mapped[int | None] = mapped_column(ForeignKey("pos_events.id"), index=True)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    referred_by_customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"))
+    loyalty_points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # redeemed on this order
 
     @property
     def balance_due(self) -> Decimal:

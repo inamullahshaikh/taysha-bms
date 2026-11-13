@@ -78,6 +78,9 @@ class OrderIn(BaseModel):
     notes: str | None = None
     internal_notes: str | None = None
     customer_instructions: str | None = None
+    campaign_id: int | None = None
+    loyalty_points: int = Field(0, ge=0)  # points to redeem as a discount
+    referral_code: str | None = None
     lines: list[LineIn] = Field(min_length=1)
 
     @field_validator("shipping_address", "billing_address", mode="after")

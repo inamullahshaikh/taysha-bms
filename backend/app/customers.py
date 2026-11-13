@@ -42,6 +42,7 @@ class Customer(Entity, Base):
     shopify_id: Mapped[str | None] = mapped_column(String(40), unique=True)
     territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id"))
     sales_rep_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    referral_code: Mapped[str | None] = mapped_column(String(20), unique=True)
 
 
 class CustomerAddress(Entity, Base):

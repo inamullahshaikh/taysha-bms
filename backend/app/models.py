@@ -14,3 +14,4 @@ from app.production import models as production_models  # noqa: F401
 from app.integrations import shopify  # noqa: F401
 from app import pos  # noqa: F401
 from app import wholesale  # noqa: F401
+from app import crm, marketing  # noqa: F401

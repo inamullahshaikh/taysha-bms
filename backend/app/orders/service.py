@@ -126,8 +126,17 @@ def price_order(db: Session, user: User, body, order_id: int | None = None) -> d
         pre = calculate(calcs, delivery_charge=ZERO)
         dc, code_pct, code_amount = discount_code_value(db, body.discount_code, pre.subtotal, on, order_id)
         pct, amount = pct + code_pct, amount + code_amount
+    referrer = None
+    if body.referral_code:
+        referrer = db.scalar(select(Customer).where(Customer.referral_code == body.referral_code.strip().upper()))
+        if referrer is None or (customer and referrer.id == customer.id):
+            raise AppError(422, "invalid_referral", "That referral code isn't valid", {"referral_code": "invalid"})
+    if body.loyalty_points:  # a loyalty benefit, not a manual discount: no pricing permission needed
+        from app.crm import points_value
+
+        amount += points_value(db, body.loyalty_points)
     totals = calculate(calcs, pct, amount, body.delivery_charge)
-    return {"customer": customer, "price_list": pl, "lines": lines, "totals": totals, "discount_code": dc,
+    return {"referrer": referrer, "customer": customer, "price_list": pl, "lines": lines, "totals": totals, "discount_code": dc,
             "order_date": on, "order_discount_pct": pct, "order_discount_amount": amount}
 
 
@@ -173,11 +182,17 @@ def apply_priced(db: Session, order: Order, body, priced: dict) -> None:
     order.order_discount_pct = priced["order_discount_pct"]
     order.order_discount_amount = priced["order_discount_amount"]
     order.notes, order.internal_notes = body.notes, body.internal_notes
+    order.campaign_id = body.campaign_id
+    order.loyalty_points = body.loyalty_points
+    order.referred_by_customer_id = priced["referrer"].id if priced.get("referrer") else order.referred_by_customer_id
     order.customer_instructions = body.customer_instructions
     for f in ("subtotal", "discount_total", "tax_total", "net_total", "delivery_charge", "rounding", "grand_total"):
         setattr(order, f, getattr(t, f))
     db.flush()
     db.execute(delete(OrderLine).where(OrderLine.order_id == order.id))
+    from app.crm import apply_redemption
+
+    apply_redemption(db, order, body.loyalty_points)
     for i, (info, lc) in enumerate(zip(priced["lines"], t.lines), start=1):
         p = info["product"]
         db.add(OrderLine(
@@ -213,6 +228,10 @@ def change_status(db: Session, order: Order, to: str, note: str | None = None) -
         stock.reserve_order(db, order)
     elif to in ("draft", "cancelled"):
         stock.release_order(db, order)
+        if to == "cancelled":
+            from app.crm import reverse_redemption
+
+            reverse_redemption(db, order)
     elif to in ("dispatched", "delivered"):
         remaining = {ln.id: ln.quantity - ln.shipped_qty for ln in lines if ln.quantity > ln.shipped_qty}
         if remaining:  # ship whatever hasn't gone out yet as one shipment
