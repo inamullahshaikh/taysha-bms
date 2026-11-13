@@ -22,6 +22,7 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "order_payments": ("Customer payments & refunds", (V, C)),
     "discount_codes": ("Discount codes", CRUD),
     "invoices": ("Invoices & sales documents", (V, C, E, X)),
+    "expenses": ("Expenses", (V, C, E, AP, X)),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -38,4 +39,6 @@ ENTITY_FEATURE: dict[str, str] = {
     "payments": "order_payments",
     "discount_codes": "discount_codes",
     "sales_documents": "invoices",
+    "expenses": "expenses",
+    **{t: "settings" for t in ("expense_categories", "cost_centres")},
 }

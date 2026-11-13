@@ -3,7 +3,9 @@ from decimal import Decimal
 from fastapi import FastAPI, encoders
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import attachments, audit_router, company, customers, errors, jobs, lookups, models, suppliers  # noqa: F401
+from app import (  # noqa: F401
+    attachments, audit_router, company, customers, errors, expenses, jobs, lookups, models, suppliers,
+)
 from app.auth import mfa_router, router as auth_router, users_router
 from app.config import settings
 from app.documents import router as documents
@@ -24,7 +26,7 @@ app.add_middleware(
 errors.install(app)
 
 MODULES = (auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
-           suppliers, orders, documents, jobs)
+           suppliers, orders, documents, jobs, expenses)
 for module in MODULES:
     for r in module.routers:
         app.include_router(r)

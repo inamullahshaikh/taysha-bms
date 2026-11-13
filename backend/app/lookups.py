@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.auth.deps import CurrentUser
 from app.company import Branch, Department, TaxRate, Unit
 from app.db import DB
+from app.expenses import CostCentre, ExpenseCategory
 from app.products.models import PriceList, ProductCategory, SalesChannel
 
 router = APIRouter(tags=["lookups"])
@@ -26,6 +27,8 @@ def lookups(_: CurrentUser, db: DB):
         "branches": _rows(db, Branch, "code", "name"),
         "departments": _rows(db, Department, "name"),
         "product_categories": _rows(db, ProductCategory, "name", "parent_id"),
+        "expense_categories": _rows(db, ExpenseCategory, "name", "parent_id"),
+        "cost_centres": _rows(db, CostCentre, "code", "name"),
     }
 
 routers = [router]

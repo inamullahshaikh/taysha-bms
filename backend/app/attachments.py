@@ -63,9 +63,14 @@ def check_parent(db: Session, user: User, entity_type: str, entity_id: int, acti
     table = Base.metadata.tables.get(entity_type)
     if feature is None or table is None:
         raise AppError(422, "invalid_entity", f"Files can't be attached to {entity_type}")
-    ensure(db, user, feature, action)
-    if db.scalar(select(table.c.id).where(table.c.id == entity_id)) is None:
+    row = db.execute(select(*[c for c in (table.c.id, table.c.get("created_by_id")) if c is not None])
+                     .where(table.c.id == entity_id)).first()
+    if row is None:
+        ensure(db, user, feature, action)
         raise not_found("Linked record")
+    own = len(row) > 1 and row[1] == user.id  # people may attach files to records they created (e.g. receipts)
+    if not own:
+        ensure(db, user, feature, action)
 
 
 # ponytail: local disk storage (a mounted volume). Add an S3 backend if the app moves to several servers.

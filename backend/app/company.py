@@ -43,6 +43,7 @@ class Company(Entity, Base):
     logo_key: Mapped[str | None] = mapped_column(String(255))
     logo_content_type: Mapped[str | None] = mapped_column(String(100))
     brand_color: Mapped[str | None] = mapped_column(String(7))  # e.g. #8B4513
+    expense_approval_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # above this: owner approves
 
 
 class Branch(Entity, Base):
@@ -119,6 +120,7 @@ class CompanyIn(BaseModel):
     bank_details: str | None = None
     invoice_terms: str | None = None
     brand_color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    expense_approval_limit: Decimal | None = Field(None, ge=0)
 
 
 class CompanyOut(CompanyIn):
