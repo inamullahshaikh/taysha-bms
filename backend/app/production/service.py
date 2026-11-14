@@ -11,8 +11,10 @@ from app.audit import audit
 from app.clock import local_today, utcnow
 from app.company import get_company
 from app.errors import AppError
-from app.inventory.models import StockMovement, StockReservation
-from app.inventory.service import available, avg_cost, fill_backorders, get_or_create_batch, issue, move
+from app.inventory.models import StockBalance, StockMovement, StockReservation
+from app.inventory.service import (
+    available, avg_cost, fill_backorders, get_or_create_batch, issue, move, usable_batch,
+)
 from app.numbering import next_number
 from app.production.models import ProductionMaterial, ProductionOrder, Recipe, RecipeLine
 from app.products.models import Product
@@ -55,18 +57,42 @@ def reserved_for(db: Session, po: ProductionOrder, product_id: int) -> Decimal:
         StockReservation.production_order_id == po.id, StockReservation.product_id == product_id))
 
 
+def availability_many(db: Session, pos: list[ProductionOrder]) -> dict[int, list[tuple[ProductionMaterial, dict]]]:
+    """Per order: (material, row) with required, issued, reserved for this order, free stock and shortage.
+    A fixed handful of queries however many orders and materials."""
+    ids = [po.id for po in pos]
+    mats = db.scalars(select(ProductionMaterial).where(ProductionMaterial.production_order_id.in_(ids))
+                      .order_by(ProductionMaterial.id)).all()
+    pids = {m.product_id for m in mats}
+    products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_(pids)))}
+    R = StockReservation
+    mine = {(o, p): q for o, p, q in db.execute(
+        select(R.production_order_id, R.product_id, func.sum(R.quantity)).where(R.production_order_id.in_(ids))
+        .group_by(R.production_order_id, R.product_id))}
+    free: dict[tuple[int, int], Decimal] = {}
+    for wh in {po.warehouse_id for po in pos}:
+        usable = dict(db.execute(select(StockBalance.product_id, func.sum(StockBalance.quantity)).where(
+            StockBalance.product_id.in_(pids), StockBalance.warehouse_id == wh, usable_batch())
+            .group_by(StockBalance.product_id)).all())
+        held = dict(db.execute(select(R.product_id, func.sum(R.quantity)).where(
+            R.product_id.in_(pids), R.warehouse_id == wh).group_by(R.product_id)).all())
+        for pid in pids:  # same as available(): usable on hand minus everything reserved in that warehouse
+            free[wh, pid] = usable.get(pid, Decimal("0")) - held.get(pid, Decimal("0"))
+    wh_of = {po.id: po.warehouse_id for po in pos}
+    out: dict[int, list] = {i: [] for i in ids}
+    for m in mats:
+        p, po_id = products[m.product_id], m.production_order_id
+        reserved_here = mine.get((po_id, m.product_id), Decimal("0"))
+        f = free[wh_of[po_id], m.product_id]
+        short = max(m.required_quantity - m.issued_quantity - reserved_here - max(f, ZERO), ZERO)
+        out[po_id].append((m, {"product_id": p.id, "sku": p.sku, "name": p.name, "required": m.required_quantity,
+                               "issued": m.issued_quantity, "reserved": reserved_here, "free_in_stock": max(f, ZERO),
+                               "shortage": short.quantize(QTY)}))
+    return out
+
+
 def availability(db: Session, po: ProductionOrder) -> list[dict]:
-    rows = []
-    for m in materials(db, po):
-        p = db.get(Product, m.product_id)
-        mine = reserved_for(db, po, m.product_id)
-        still = m.required_quantity - m.issued_quantity
-        free = available(db, m.product_id, po.warehouse_id)
-        short = max(still - mine - max(free, ZERO), ZERO)
-        rows.append({"product_id": p.id, "sku": p.sku, "name": p.name, "required": m.required_quantity,
-                     "issued": m.issued_quantity, "reserved": mine, "free_in_stock": max(free, ZERO),
-                     "shortage": short.quantize(QTY)})
-    return rows
+    return [row for _, row in availability_many(db, [po])[po.id]]
 
 
 def reserve(db: Session, po: ProductionOrder) -> None:

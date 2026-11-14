@@ -24,8 +24,8 @@ from app.production.models import (
     DEFAULT_STAGES, ProductionMaterial, ProductionOrder, ProductionStage, Recipe, RecipeLine,
 )
 from app.production.service import (
-    availability, complete, issue_materials, materials, release, requirements, reserve, round_up_batches,
-    standard_cost,
+    availability, availability_many, complete, issue_materials, materials, release, requirements, reserve,
+    round_up_batches, standard_cost,
 )
 from app.products.models import Product
 
@@ -269,17 +269,34 @@ class PROut(RecordOut):
     stages: list[dict] = []
 
 
+def pr_outs(db: Session, pos: list[ProductionOrder], show_cost: bool = True) -> list[PROut]:
+    """Orders with materials and stages; the whole page in a fixed number of queries."""
+    ids = [po.id for po in pos]
+    # load into the identity map so db.get() below doesn't query per order
+    db.scalars(select(Product).where(Product.id.in_({po.product_id for po in pos}))).all()
+    db.scalars(select(Recipe).where(Recipe.id.in_({po.recipe_id for po in pos}))).all()
+    avail = availability_many(db, pos)
+    stages: dict[int, list[dict]] = {i: [] for i in ids}
+    for s in db.scalars(select(ProductionStage).where(ProductionStage.production_order_id.in_(ids))
+                        .order_by(ProductionStage.production_order_id, ProductionStage.seq)):
+        stages[s.production_order_id].append({k: getattr(s, k) for k in (
+            "id", "seq", "name", "status", "assigned_to_id", "started_at", "finished_at", "note")})
+    return [_pr_out(db, po, avail[po.id], stages[po.id], show_cost) for po in pos]
+
+
 def pr_out(db: Session, po: ProductionOrder, show_cost: bool = True) -> PROut:
+    return pr_outs(db, [po], show_cost)[0]
+
+
+def _pr_out(db: Session, po: ProductionOrder, mats: list, stages: list[dict], show_cost: bool) -> PROut:
     o = PROut.model_validate(po)
     o.product_name = db.get(Product, po.product_id).name
     o.recipe_version = db.get(Recipe, po.recipe_id).version
-    o.materials = availability(db, po)
-    for m, row in zip(materials(db, po), o.materials):
+    o.materials = []
+    for m, row in mats:
         row["actual"] = m.actual_quantity
-    o.stages = [{k: getattr(s, k) for k in ("id", "seq", "name", "status", "assigned_to_id", "started_at",
-                                            "finished_at", "note")}
-                for s in db.scalars(select(ProductionStage).where(ProductionStage.production_order_id == po.id)
-                                    .order_by(ProductionStage.seq))]
+        o.materials.append(row)
+    o.stages = stages
     if po.output_quantity is not None and po.planned_quantity:
         o.yield_pct = (po.output_quantity / po.planned_quantity * 100).quantize(Decimal("0.1"))
         made = po.output_quantity + (po.rejected_quantity or 0) + (po.wastage_quantity or 0)
@@ -364,8 +381,7 @@ def list_pos(db: DB, p: Annotated[ListParams, Depends()], f: Annotated[PRFilters
     q = f.apply(apply_filters(select(ProductionOrder), ProductionOrder, p, (ProductionOrder.number,),
                               {"planned_start": ProductionOrder.planned_start, "number": ProductionOrder.number}))
     page = paginate(db, q, p)
-    show = can_see_cost(db, user)
-    page["items"] = [pr_out(db, x, show) for x in page["items"]]
+    page["items"] = pr_outs(db, page["items"], can_see_cost(db, user))
     return page
 
 
