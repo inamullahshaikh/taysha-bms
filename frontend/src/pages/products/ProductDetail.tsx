@@ -197,7 +197,7 @@ function StockTab({ id }: { id: number }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap justify-end gap-2"><StockActions defaults={{ product_id: id }} /></div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="On hand by warehouse and batch" pad={false}>
           {!bal.data?.length ? <Empty title="Nothing in stock" /> : (
             <table className="w-full text-[13.5px]">

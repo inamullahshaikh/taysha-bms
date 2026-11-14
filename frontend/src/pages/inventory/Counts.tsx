@@ -52,6 +52,7 @@ export function CountPage() {
   const toast = useToast()
   const wh = useLookupName('warehouses')
   const product = useRefMap('/products', productLabel)
+  const batch = useRefMap('/stock/batches', (r) => r.number)
   const key = [`/stock/counts/${id}`]
   const { data: c, isLoading } = useQuery({ queryKey: key, queryFn: () => api.get(`/stock/counts/${id}`) })
   const [counts, setCounts] = useState<Record<number, string>>({})
@@ -116,7 +117,7 @@ export function CountPage() {
             <li key={l.id} className="flex items-center gap-4 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14.5px] font-medium">{product(l.product_id)}</p>
-                {!open && <p className="text-[12.5px] text-muted">System {qty(l.system_quantity)}</p>}
+                <p className="text-[12.5px] text-muted">{[l.batch_id && `Batch ${batch(l.batch_id)}`, !open && `System ${qty(l.system_quantity)}`].filter(Boolean).join(' · ')}</p>
               </div>
               {open ? (
                 <Input data-line={l.id} aria-label={`Counted ${product(l.product_id)}`} type="number" inputMode="decimal" step="any"

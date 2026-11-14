@@ -34,7 +34,7 @@ export default function Stock() {
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <DataTable
           path="/stock/balances"
           search="Search items"

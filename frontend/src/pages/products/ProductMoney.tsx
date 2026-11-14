@@ -23,7 +23,7 @@ export function Pricing({ id }: { id: number }) {
   if (isLoading) return <Loading />
   const edit = can('product_prices', 'edit')
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card title="Current prices" pad={false} action={edit && <Button size="sm" variant="primary" icon={<Plus className="size-4" />} onClick={() => setAdd({})}>New price</Button>}>
         <table className="w-full text-[13.5px]">
           <thead><tr className="border-b border-line text-left"><th className={th}>Price list</th><th className={`${th} text-right`}>Price</th><th className={th}>Since</th></tr></thead>
@@ -86,7 +86,7 @@ export function Costs({ id }: { id: number }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartCard title="Unit cost" sub={cur ? `Since ${date(cur.effective_from)}` : 'No cost recorded yet'}
           action={can('product_costs', 'edit') && <Button size="sm" variant="primary" icon={<Plus className="size-4" />} onClick={() => setAdd(true)}>Update cost</Button>}>
           {cur ? <>

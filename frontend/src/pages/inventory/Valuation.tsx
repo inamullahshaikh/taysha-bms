@@ -33,7 +33,7 @@ export default function Valuation() {
         )}
       </div>
       {isLoading ? <Loading /> : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <ChartCard title="Total stock value" sub="At weighted-average cost">
             <p className="mb-5 text-[34px] leading-none font-semibold tracking-[-0.02em]">{money(data?.total)}</p>
             <BarList fmt={compactMoney} limit={10}
