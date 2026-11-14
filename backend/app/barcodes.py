@@ -79,7 +79,9 @@ def lookup(code: str, db: DB, _: CurrentUser):
 
 @router.get("/barcodes/image")
 def image(value: str, _: CurrentUser, symbology: Literal["code128", "ean13", "qr"] = "code128"):
-    return Response(svg(value, symbology), media_type="image/svg+xml", headers={"Cache-Control": "max-age=86400"})
+    # QR values can carry secrets (the 2FA otpauth URI), so they are never cached
+    cache = "no-store" if symbology == "qr" else "private, max-age=86400"
+    return Response(svg(value, symbology), media_type="image/svg+xml", headers={"Cache-Control": cache})
 
 
 class LabelItem(BaseModel):
