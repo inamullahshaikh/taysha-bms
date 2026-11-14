@@ -129,7 +129,7 @@ export function History({ entity, id }: { entity: string; id: number }) {
         <ol className="scroll-quiet max-h-96 overflow-y-auto px-4 py-3">
           {data.map((e) => {
             const changed = e.after && e.before
-              ? Object.keys(e.after).filter((k) => !SKIP.has(k) && JSON.stringify(e.after[k]) !== JSON.stringify(e.before?.[k]))
+              ? Object.keys(e.after).filter((k) => !SKIP.has(k) && k !== e.action && JSON.stringify(e.after[k]) !== JSON.stringify(e.before?.[k]))
               : []
             return (
               <li key={e.id} className="relative border-l border-line pb-3.5 pl-4 last:pb-0">

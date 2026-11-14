@@ -99,7 +99,7 @@ export function DataTable<T extends { id?: number }>({
             <Button variant="ghost" size="sm" icon={<X className="size-3.5" />}
               onClick={() => { st.set('q', ''); filters.forEach((f) => st.set(f.key, '')) }}>Clear</Button>
           )}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {isFetching && !isLoading && <Spinner className="size-4" />}
             {toolbar}
             {exportFeature && can(exportFeature, 'export') && (

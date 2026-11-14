@@ -142,7 +142,9 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [hi, setHi] = useState(0)
+  const [picked, setPicked] = useState<{ id: string; label: string } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const pickedLabel = picked && picked.id === String(value) ? picked.label : null
   const results = useQuery({
     queryKey: ['pick', source.path, q, source.params],
     queryFn: async () => asPage(await api.get(source.path, { ...source.params, q, page_size: 20 })).items,
@@ -151,8 +153,9 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
   const selected = useQuery({
     queryKey: [`${source.path}/${value}`],
     queryFn: () => api.get(`${source.path}/${value}`),
-    enabled: !!value,
+    enabled: !!value && !pickedLabel,
     staleTime: 60_000,
+    retry: false,
   })
   useEffect(() => {
     if (!open) return
@@ -161,8 +164,8 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
     return () => document.removeEventListener('mousedown', h)
   }, [open])
   const items = results.data ?? []
-  const pick = (r: any) => { onChange(String(r.id), r); setOpen(false); setQ('') }
-  const shown = open ? q : value ? (selected.data ? toLabel(selected.data) : '…') : ''
+  const pick = (r: any) => { setPicked({ id: String(r.id), label: toLabel(r) }); onChange(String(r.id), r); setOpen(false); setQ('') }
+  const shown = open ? q : value ? (pickedLabel ?? (selected.data ? toLabel(selected.data) : selected.isError ? `#${value}` : '…')) : ''
 
   return (
     <div ref={ref} className="relative">
@@ -203,7 +206,7 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
 export type LineCol = {
   name: string
   label: string
-  type?: 'product' | 'number' | 'money' | 'text' | 'select' | 'record'
+  type?: 'product' | 'number' | 'money' | 'text' | 'date' | 'select' | 'record'
   options?: (string | { value: string | number; label: string })[]
   record?: RecordSource
   width?: string
@@ -240,7 +243,7 @@ export function LineItems({ value, onChange, columns, newRow, errors, addLabel =
                         <Select value={row[c.name] ?? ''} options={c.options ?? []} onChange={(e) => set(i, c.name, e.target.value)} />
                       ) : (
                         <Input aria-label={c.label} aria-invalid={!!err || undefined} placeholder={c.placeholder}
-                          type={c.type === 'text' ? 'text' : 'number'} step="any" inputMode={c.type === 'text' ? undefined : 'decimal'}
+                          type={c.type === 'text' || c.type === 'date' ? c.type : 'number'} step="any" inputMode={c.type === 'text' || c.type === 'date' ? undefined : 'decimal'}
                           value={row[c.name] ?? ''} onChange={(e) => set(i, c.name, e.target.value)} />
                       )}
                       {err && <p className="mt-1 text-[11.5px] text-bad">{err}</p>}

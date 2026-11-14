@@ -1,7 +1,7 @@
 import { Loader2, X } from 'lucide-react'
 import {
   useEffect, useId, useRef, useState,
-  type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
+  type ButtonHTMLAttributes, type ComponentProps, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -75,7 +75,7 @@ export function Field({ label, error, hint, children, className, htmlFor }: {
   )
 }
 
-export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => (
+export const Input = ({ className, ...p }: ComponentProps<'input'>) => (
   <input className={cx(control, width(className), p.type === 'number' && 'tabular', className)} {...p} />
 )
 
@@ -173,7 +173,7 @@ const toneClass: Record<Tone, string> = {
 const STATUS_TONE: Record<string, Tone> = {}
 const set = (tone: Tone, words: string) => words.split(' ').forEach((w) => (STATUS_TONE[w] = tone))
 set('good', 'delivered paid approved completed done active pass passed ok available received issued accepted published won closed resolved released in_use posted fulfilled launched billed sent')
-set('info', 'confirmed processing packed in_progress submitted ordered partially_received running started open scheduled planned testing qualified contacted in_transit partially_paid shipped approved_pending new todo')
+set('info', 'dispatched confirmed processing packed in_progress submitted ordered partially_received running started open scheduled planned testing qualified contacted in_transit partially_paid shipped approved_pending new todo')
 set('warn', 'pending draft hold on_hold cod_pending low partially_billed due_soon expiring under_repair idle paused waiting review medium samples_sent agreed blocked')
 set('bad', 'cancelled rejected failed overdue out_of_stock expired fail returned refunded lost recalled high urgent critical disposed retired issue')
 
@@ -362,11 +362,11 @@ export function Tabs<T extends string>({ tabs, value, onChange }: {
 }
 
 /** Segmented control for small filter sets (date ranges, views). */
-export function Segmented<T extends string>({ options, value, onChange }: {
-  options: { value: T; label: string }[]; value: T; onChange: (v: T) => void
+export function Segmented<T extends string>({ options, value, onChange, className }: {
+  options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; className?: string
 }) {
   return (
-    <div className="inline-flex rounded-lg bg-sunken p-0.5" role="radiogroup">
+    <div className={cx('inline-flex max-w-full self-start overflow-x-auto rounded-lg bg-sunken p-0.5', className)} role="radiogroup">
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
           className={cx('h-7 rounded-md px-2.5 text-[12.5px] font-medium whitespace-nowrap transition',

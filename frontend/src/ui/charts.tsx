@@ -42,7 +42,7 @@ export function StatTile({ label, value, delta, upIsGood = true, sub, to, spark 
           </span>
         )}
       </div>
-      <p className="mt-2 text-[26px] leading-none font-semibold tracking-[-0.02em] text-ink">{value}</p>
+      <p className="mt-2 text-[21px] leading-none font-semibold tracking-[-0.02em] whitespace-nowrap text-ink sm:text-[26px]">{value}</p>
       <div className="mt-auto flex items-end justify-between gap-3 pt-2">
         {sub ? <p className="text-[12px] text-muted">{sub}</p> : <span />}
         {spark && spark.length > 1 && <span className="hidden sm:block"><Sparkline values={spark} /></span>}
@@ -99,19 +99,39 @@ export function Legend({ items }: { items: { label: string; color: string }[] })
 
 /* ---------- Trend (time series) ---------- */
 
+/** Round axis ticks (0 / 100K / 200K…), about four steps, covering negatives too. */
+export function niceTicks(min: number, max: number): number[] {
+  const span = max - min || 1
+  const raw = span / 4
+  const p = 10 ** Math.floor(Math.log10(raw))
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((s) => s >= raw)!
+  const lo = Math.floor(min / step) * step
+  const hi = Math.ceil(max / step) * step
+  const out: number[] = []
+  for (let v = lo; v <= hi + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6)
+  return out
+}
+
 export type Series = { key: string; label: string; color?: string }
 
-export function TrendChart({ data, x, series, kind = 'area', height = 260, fmt = compact as Fmt, xFmt, stacked }: {
+export function TrendChart({ data, x, series, kind = 'area', height = 260, fmt = compact as Fmt, xFmt, stacked, fitY }: {
   data: any[]; x: string; series: Series[]; kind?: 'area' | 'line' | 'bar'; height?: number
   fmt?: Fmt; xFmt?: (v: string) => string; stacked?: boolean
+  /** zoom the y-axis to the data (lines only: prices, unit costs) instead of starting at zero */
+  fitY?: boolean
 }) {
-  const rows = data.map((d) => ({ ...d, ...Object.fromEntries(series.map((s) => [s.key, n(d[s.key])])) }))
+  // missing values stay null so lines show a gap instead of a false zero
+  const rows = data.map((d) => ({ ...d, ...Object.fromEntries(series.map((s) => [s.key, d[s.key] == null || d[s.key] === '' ? null : Number(d[s.key])])) }))
   const colors = series.map((s, i) => s.color ?? SERIES[i % SERIES.length])
+  const vals = rows.flatMap((r) => series.map((s) => r[s.key])).filter((v): v is number => v != null)
+  const totals = stacked ? rows.map((r) => series.reduce((t, s) => t + (r[s.key] ?? 0), 0)) : vals
+  const ticks = fitY && kind === 'line' ? undefined : niceTicks(Math.min(0, ...vals), Math.max(0, ...totals))
   const axes = (
     <>
       <CartesianGrid vertical={false} stroke={GRID} />
       <XAxis dataKey={x} tickFormatter={xFmt} tickLine={false} axisLine={{ stroke: '#e1d6cc' }} tick={{ fill: AXIS, fontSize: 11.5 }} tickMargin={8} minTickGap={16} />
-      <YAxis tickFormatter={(v) => compact(v)} tickLine={false} axisLine={false} tick={{ fill: AXIS, fontSize: 11.5 }} width={44} />
+      <YAxis tickFormatter={(v) => compact(v)} tickLine={false} axisLine={false} tick={{ fill: AXIS, fontSize: 11.5 }} width={44}
+        domain={ticks ? [ticks[0], ticks[ticks.length - 1]] : ['auto', 'auto']} ticks={ticks} />
       <Tooltip cursor={kind === 'bar' ? { fill: '#f6eee8' } : { stroke: '#d8c9cc', strokeWidth: 1 }} content={<TipBox fmt={fmt} labelFmt={xFmt} />} />
     </>
   )
@@ -207,9 +227,9 @@ export function SegmentBar({ parts, fmt = compact as Fmt }: { parts: { label: st
           )
         })}
       </div>
-      <ul className="mt-3 grid grid-cols-2 gap-x-5 gap-y-1.5 text-[12.5px]">
+      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px]">
         {list.map((p, i) => (
-          <li key={p.label} className="flex items-center justify-between gap-2">
+          <li key={p.label} className="flex items-center gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-ink-2">
               <span className="size-2 shrink-0 rounded-sm" style={{ background: p.color ?? SERIES[i % SERIES.length] }} />
               <span className="truncate">{p.label}</span>
