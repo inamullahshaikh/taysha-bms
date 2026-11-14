@@ -8,9 +8,6 @@ import base64
 import io
 from typing import Literal
 
-import barcode
-import segno
-from barcode.writer import SVGWriter
 from fastapi import APIRouter
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -33,6 +30,10 @@ router = APIRouter(tags=["barcodes"])
 
 def svg(value: str, symbology: str = "code128") -> str:
     """SVG markup for a barcode or QR code."""
+    import barcode  # imported on use (pulls in Pillow); most requests never draw one
+    import segno
+    from barcode.writer import SVGWriter
+
     if symbology == "qr":
         buf = io.BytesIO()
         segno.make(value, error="m").save(buf, kind="svg", scale=4, border=1)

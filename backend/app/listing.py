@@ -8,14 +8,12 @@ from typing import Any, Generic, TypeVar
 
 from fastapi import Query
 from fastapi.responses import StreamingResponse
-from openpyxl import Workbook
 from pydantic import BaseModel
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.audit import audit
 from app.errors import AppError
-
 
 T = TypeVar("T")
 
@@ -85,6 +83,8 @@ def export_response(db: Session, rows: list[dict], columns: list[tuple[str, str]
             w.writerow([r.get(k) for k, _ in columns])
         data, media, ext = buf.getvalue().encode("utf-8-sig"), "text/csv", "csv"
     elif fmt == "xlsx":
+        from openpyxl import Workbook  # heavy; only loaded when someone exports to Excel
+
         wb = Workbook()
         ws = wb.active
         ws.append([h for _, h in columns])

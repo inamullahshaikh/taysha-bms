@@ -11,9 +11,6 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-
-import httpx
-from cryptography.fernet import Fernet
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -90,7 +87,9 @@ class ProcessedWebhook(Base):
 
 # ---------- settings & client ----------
 
-def fernet() -> Fernet:
+def fernet():
+    from cryptography.fernet import Fernet  # imported on use: most requests never touch Shopify
+
     return Fernet(base64.urlsafe_b64encode(hashlib.sha256(settings.secret_key.encode()).digest()))
 
 
@@ -107,11 +106,13 @@ def secrets_of(s: IntegrationSetting) -> dict:
     return json.loads(fernet().decrypt(s.secret.encode())) if s.secret else {}
 
 
-# Tests replace this to talk to a fake Shopify.
-transport: httpx.BaseTransport | None = None
+# An httpx transport; tests replace it to talk to a fake Shopify.
+transport = None
 
 
-def client(db: Session) -> httpx.Client:
+def client(db: Session) -> "httpx.Client":  # noqa: F821  (httpx is imported on use)
+    import httpx
+
     s = get_setting(db)
     sec = secrets_of(s)
     if not s.config.get("shop_domain") or not sec.get("access_token"):
@@ -360,6 +361,8 @@ def push_stock(db: Session) -> str:
 
 def push_fulfilments(db: Session) -> str:
     """Tell Shopify about dispatched orders (with courier and tracking)."""
+    import httpx
+
     if not get_setting(db).enabled:
         return "disabled"
     n = 0

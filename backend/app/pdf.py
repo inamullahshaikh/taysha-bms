@@ -3,17 +3,15 @@
 import base64
 from datetime import date, datetime
 from decimal import Decimal
+from functools import cache
 from pathlib import Path
 
 from fastapi.responses import Response
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 
 from app.attachments import read_file
 from app.clock import TZ
 from app.company import get_company
-
-env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"), autoescape=select_autoescape())
 
 
 def _money(v) -> str:
@@ -44,7 +42,14 @@ def _label(v) -> str:
     return "" if not v else v.replace("_", " ").capitalize().replace("Cod", "COD")
 
 
-env.filters.update(money=_money, qty=_qty, date=_date, address=_address, label=_label)
+@cache
+def env():
+    """Template environment, built on first print (Jinja2 isn't needed by most requests)."""
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    e = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"), autoescape=select_autoescape())
+    e.filters.update(money=_money, qty=_qty, date=_date, address=_address, label=_label)
+    return e
 
 
 def render_pdf(db: Session, template: str, **ctx) -> bytes:
@@ -54,7 +59,7 @@ def render_pdf(db: Session, template: str, **ctx) -> bytes:
     logo = None
     if company.logo_key:
         logo = f"data:{company.logo_content_type};base64,{base64.b64encode(read_file(company.logo_key)).decode()}"
-    html = env.get_template(template).render(company=company, logo=logo, brand=company.brand_color or "#5b3a29",
+    html = env().get_template(template).render(company=company, logo=logo, brand=company.brand_color or "#5b3a29",
                                              today=date.today(), **ctx)
     return HTML(string=html).write_pdf()
 

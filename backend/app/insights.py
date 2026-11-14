@@ -7,7 +7,6 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter
-from openpyxl import Workbook
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Boolean, Date, DateTime, String, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
@@ -235,6 +234,8 @@ def build(db: Session, report: str, params: dict) -> tuple[str, list[dict]]:
 
 
 def to_xlsx(title: str, rows: list[dict]) -> bytes:
+    from openpyxl import Workbook  # heavy; only loaded when a scheduled report is sent
+
     wb = Workbook()
     ws = wb.active
     ws.title = title[:30]
