@@ -19,11 +19,29 @@ New migration: `docker compose run --rm api alembic revision --autogenerate -m "
 Background jobs (overdue invoices, daily backup, weekly restore test) run in the `scheduler` container.
 Run one now: `docker compose run --rm api python -m app.jobs --run backup`.
 
+## Frontend (React + Vite)
+
+Needs Node 22+. With the backend running:
+
+```sh
+cd frontend
+npm install
+npm run dev          # http://localhost:5173, proxies /api to the API on :8010 (override with API_URL)
+npm run build        # type-check and build into frontend/dist
+```
+
+- Sections live in `src/modules/` (one file per sidebar entry: its tabs, record pages and access rules). Record URLs
+  mirror the API paths (`/orders/12`), so links in notifications open the right page.
+- Shared pieces are in `src/ui/` (data table, forms, record pickers, line items, charts) and `src/lib/` (API client,
+  access checks, formatting). Gate buttons with `useCan()(feature, action)`; the API enforces the same rules.
+- Never calculate money, totals or stock in the browser: show what the API returns (order totals come from
+  `POST /orders/preview`).
+
 ## Deploying (production / staging)
 
 1. On the server: install Docker, clone the repo, point the domain's DNS at the server.
 2. `cp .env.example .env` and fill it in (long random `POSTGRES_PASSWORD`, `DOMAIN`, SMTP).
-3. Build the frontend into `frontend/dist` (see frontend README).
+3. Build the frontend: `cd frontend && npm ci && npm run build` (Caddy serves `frontend/dist`).
 4. `docker compose -f docker-compose.prod.yml --env-file .env up -d --build`
 5. `docker compose -f docker-compose.prod.yml exec api python -m app.cli create-owner --name "..." --email ...`
 
