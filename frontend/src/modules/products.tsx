@@ -1,15 +1,20 @@
 import { Package } from 'lucide-react'
+import { lazy } from 'react'
 import type { Section } from '../app/section'
-import { Stub } from './_stub'
+
+const Products = lazy(() => import('../pages/products/Products'))
+const ProductDetail = lazy(() => import('../pages/products/ProductDetail'))
+const Categories = lazy(() => import('../pages/products/Categories'))
+const Labels = lazy(() => import('../pages/products/Labels'))
 
 export const products: Section = {
   key: 'products', label: 'Products', icon: Package, group: 'ops',
   pages: [
-    { path: '/products', label: 'Products', access: 'products', element: <Stub name="Products" /> },
-    { path: '/product-categories', label: 'Categories', access: 'products', element: <Stub name="Categories" /> },
-    { path: '/labels', label: 'Labels', access: ['products', 'inventory'], element: <Stub name="Labels" /> },
+    { path: '/products', label: 'Products', access: 'products', element: <Products /> },
+    { path: '/product-categories', label: 'Categories', access: 'products', element: <Categories /> },
+    { path: '/labels', label: 'Labels', access: 'products', element: <Labels /> },
   ],
   routes: [
-    { path: '/products/:id', label: 'Product', access: 'products', element: <Stub name="Product" /> },
+    { path: '/products/:id', label: 'Product', access: 'products', element: <ProductDetail /> },
   ],
 }
