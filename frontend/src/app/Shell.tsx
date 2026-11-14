@@ -108,7 +108,7 @@ function Notifications() {
     <Menu trigger={
       <IconButton label={`Notifications${data?.unread ? `, ${data.unread} unread` : ''}`} className="relative">
         <Bell className="size-[18px]" />
-        {!!data?.unread && <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-wine-800 px-1 text-[10px] font-semibold text-cream">{data.unread > 99 ? '99+' : data.unread}</span>}
+        {!!data?.unread && <span className="absolute -top-0.5 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-wine-800 px-1 text-[10px] leading-none font-semibold text-cream ring-2 ring-page">{data.unread > 99 ? '99+' : data.unread}</span>}
       </IconButton>
     }>
       <div className="w-[min(360px,calc(100vw-2rem))]">
