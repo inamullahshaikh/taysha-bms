@@ -107,17 +107,24 @@ def cost_changes(db: Session, days: int) -> list[dict]:
     by: dict[int, list] = {}
     for pid, d, c in rows:
         by.setdefault(pid, []).append((d, c))
+    changed = db.scalars(select(ProductCost.product_id).where(func.date(ProductCost.created_at) >= since)
+                         .distinct()).all()
+    last_two: dict[int, list] = {}  # newest two standard costs per changed product, one query
+    for pc in db.scalars(select(ProductCost).where(ProductCost.product_id.in_(changed)).order_by(
+            ProductCost.product_id, ProductCost.effective_from.desc(), ProductCost.id.desc())):
+        if len(last_two.setdefault(pc.product_id, [])) < 2:
+            last_two[pc.product_id].append(pc)
+    names = dict(db.execute(select(Product.id, Product.name).where(Product.id.in_(set(by) | set(changed)))).all())
     for pid, seq in by.items():
         first, last = seq[0][1], seq[-1][1]
         if first and first != last:
-            out.append({"product_id": pid, "name": db.get(Product, pid).name, "source": "purchases",
+            out.append({"product_id": pid, "name": names[pid], "source": "purchases",
                         "from": first.quantize(Decimal("0.0001")), "to": last.quantize(Decimal("0.0001")),
                         "change_pct": ((last - first) / first * 100).quantize(Decimal("0.1"))})
-    for pid in db.scalars(select(ProductCost.product_id).where(func.date(ProductCost.created_at) >= since).distinct()):
-        hist = db.scalars(select(ProductCost).where(ProductCost.product_id == pid)
-                          .order_by(ProductCost.effective_from.desc(), ProductCost.id.desc()).limit(2)).all()
+    for pid in changed:
+        hist = last_two.get(pid, [])
         if len(hist) == 2 and hist[1].total and hist[0].total != hist[1].total:
-            out.append({"product_id": pid, "name": db.get(Product, pid).name, "source": "standard cost",
+            out.append({"product_id": pid, "name": names[pid], "source": "standard cost",
                         "from": hist[1].total, "to": hist[0].total,
                         "change_pct": ((hist[0].total - hist[1].total) / hist[1].total * 100).quantize(Decimal("0.1"))})
     return sorted(out, key=lambda r: -abs(r["change_pct"]))
