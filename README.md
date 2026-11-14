@@ -37,7 +37,11 @@ npm run build        # type-check and build into frontend/dist
 - Never calculate money, totals or stock in the browser: show what the API returns (order totals come from
   `POST /orders/preview`).
 
-## Deploying (production / staging)
+## Deploying on Railway
+
+See [RAILWAY.md](RAILWAY.md): one web service (root `Dockerfile`), a cron job for background work, and Postgres.
+
+## Deploying on your own server (production / staging)
 
 1. On the server: install Docker, clone the repo, point the domain's DNS at the server.
 2. `cp .env.example .env` and fill it in (long random `POSTGRES_PASSWORD`, `DOMAIN`, SMTP).
