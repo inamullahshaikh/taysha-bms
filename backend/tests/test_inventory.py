@@ -159,6 +159,17 @@ def test_transfer_in_transit(inv):
     assert bal(c, pid, wh2)["on_hand"] == "4.000" and bal(c, pid)["in_transit"] == "0.000"
 
 
+def test_company_wide_status_uses_warehouse_rules(inv):
+    c, wh, wh2, pid = inv["c"], inv["wh"], inv["wh2"], inv["product"]["id"]
+    receive(c, wh, pid, 5, batch="B1")
+    receive(c, wh2, pid, 50, batch="B2")
+    assert bal(c, pid)["status"] == "ok"  # no rules yet
+    c.put("/stock/rules", json={"product_id": pid, "warehouse_id": wh, "reorder_point": "10"})
+    assert bal(c, pid, wh)["status"] == "low"
+    assert bal(c, pid)["status"] == "low"  # all-warehouses view shows the worst ruled warehouse, like the dashboard
+    assert c.get("/dashboard").json()["inventory"]["low_stock"] == 1
+
+
 def test_stock_count_reconciles(inv):
     c, wh, pid = inv["c"], inv["wh"], inv["product"]["id"]
     receive(c, wh, pid, 10, batch="B1")

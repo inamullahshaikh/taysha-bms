@@ -151,9 +151,20 @@ def balances(db: DB, p: Annotated[ListParams, Depends()], warehouse_id: int | No
     ids = [x.id for x in products]
     summ, transit = stock_summary(db, ids, warehouse_id), in_transit(db, ids)
     rules = {}
+    worst: dict[int, str] = {}
     if warehouse_id:
         rules = {r.product_id: r for r in db.scalars(select(ReorderRule).where(
             ReorderRule.warehouse_id == warehouse_id, ReorderRule.product_id.in_(ids)))}
+    else:
+        # company-wide: a product is as bad as its worst warehouse that has a rule (same basis as the dashboard)
+        from app.inventory.service import available, on_hand
+
+        rank = {"out_of_stock": 3, "low": 2, "overstock": 1, "ok": 0}
+        for r in db.scalars(select(ReorderRule).where(ReorderRule.product_id.in_(ids))):
+            st = stock_status({"on_hand": on_hand(db, r.product_id, r.warehouse_id),
+                               "available": available(db, r.product_id, r.warehouse_id)}, r)
+            if rank[st] > rank[worst.get(r.product_id, "ok")]:
+                worst[r.product_id] = st
     show_value = can(db, user, "product_costs", "view")
     rows = []
     for prod in products:
@@ -162,7 +173,7 @@ def balances(db: DB, p: Annotated[ListParams, Depends()], warehouse_id: int | No
                "in_transit": Decimal(transit.get(prod.id, ZERO)).quantize(Decimal("0.001"))}
         rule = rules.get(prod.id)
         row["reorder_point"] = rule.reorder_point if rule else None
-        row["status"] = stock_status(row, rule)
+        row["status"] = worst.get(prod.id) or stock_status(row, rule)
         if show_value:
             cost = avg_cost(db, prod.id)
             row["avg_cost"], row["value"] = cost, (s["on_hand"] * cost).quantize(Decimal("0.01"))
