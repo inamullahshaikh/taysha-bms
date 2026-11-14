@@ -97,7 +97,16 @@ export function Board({ params }: { params: Record<string, any> }) {
   const key = ['/tasks', 'board', params]
   const { data, isLoading } = useQuery({
     queryKey: key,
-    queryFn: async () => asPage<any>(await api.get('/tasks', { ...params, page_size: 500 })).items,
+    // every open task, but only the latest finished ones: done tasks pile up forever and would push open
+    // work off a single capped list
+    queryFn: async () => {
+      if (params.status) return asPage<any>(await api.get('/tasks', { ...params, page_size: 500 })).items
+      const [open, done] = await Promise.all([
+        api.get('/tasks', { ...params, status: 'todo,in_progress,blocked', page_size: 500 }),
+        api.get('/tasks', { ...params, status: 'done', sort: '-due_date', page_size: 30 }),
+      ])
+      return [...asPage<any>(open).items, ...asPage<any>(done).items]
+    },
   })
   const move = useAction(({ id, status }: { id: number; status: string }) => api.patch(`/tasks/${id}`, { status }), {
     invalidate: [['/tasks'], ['/tasks/overview']],
@@ -116,7 +125,7 @@ export function Board({ params }: { params: Record<string, any> }) {
             className={cx('flex w-72 shrink-0 flex-col rounded-card bg-sunken/70 p-2 transition lg:w-auto', over === col && 'bg-wine-50 ring-2 ring-wine-200')}>
             <header className="flex items-center justify-between px-1.5 pt-1 pb-2.5">
               <h3 className="text-[12.5px] font-semibold text-ink-2">{label(col)}</h3>
-              <span className="tabular text-[12px] text-muted">{cards.length}</span>
+              <span className="tabular text-[12px] text-muted">{cards.length}{col === 'done' && !params.status && cards.length >= 30 ? '+' : ''}</span>
             </header>
             <div className="flex min-h-24 flex-col gap-2">
               {cards.map((t) => (

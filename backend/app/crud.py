@@ -33,7 +33,8 @@ def get_or_404(db, model, id_: int, what: str | None = None):
 
 
 def equality_filters(query, request: Request, filters: dict):
-    """?name=value for each allowed filter. JSONB list columns match when they contain the value."""
+    """?name=value for each allowed filter; ?name=a,b matches either. JSONB list columns match when they contain
+    the value."""
     for name, col in filters.items():
         raw = request.query_params.get(name)
         if raw is None or raw == "":
@@ -42,10 +43,11 @@ def equality_filters(query, request: Request, filters: dict):
             query = query.where(col.contains([raw]))
             continue
         try:
-            value = col.type.python_type(raw) if col.type.python_type is not bool else raw.lower() == "true"
+            conv = col.type.python_type
+            values = [conv(v) if conv is not bool else v.lower() == "true" for v in raw.split(",")]
         except (ValueError, TypeError):
             raise AppError(422, "invalid_filter", f"Invalid value for {name}", {name: "invalid"})
-        query = query.where(col == value)
+        query = query.where(col == values[0] if len(values) == 1 else col.in_(values))
     return query
 
 
