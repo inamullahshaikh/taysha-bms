@@ -463,6 +463,7 @@ crud_routers = [
                 tags=["marketing"]),
     crud_router(ContentItem, prefix="/content", feature="marketing", create=ContentIn, update=ContentPatch,
                 out=ContentOut, search=(ContentItem.title, ContentItem.caption),
+                sorts={"scheduled_for": ContentItem.scheduled_for},
                 filters={"status": ContentItem.status, "campaign_id": ContentItem.campaign_id,
                          "platform": ContentItem.platform, "owner_id": ContentItem.owner_id},
                 default_sort=ContentItem.scheduled_for.asc().nulls_last(), tags=["marketing"]),

@@ -57,7 +57,17 @@ export default function Content() {
 function Board({ onOpen }: { onOpen: (r: any) => void }) {
   const { can } = useAuth()
   const owner = useRefMap('/users')
-  const { data } = useQuery({ queryKey: ['/content', 'board'], queryFn: async () => asPage(await api.get('/content', { page_size: 500 })).items as any[] })
+  // everything in the pipeline, but only the latest published posts (those pile up forever)
+  const { data } = useQuery({
+    queryKey: ['/content', 'board'],
+    queryFn: async () => {
+      const [open, published] = await Promise.all([
+        api.get('/content', { status: STAGES.filter((s) => s !== 'published').join(','), page_size: 500 }),
+        api.get('/content', { status: 'published', sort: '-scheduled_for', page_size: 30 }),
+      ])
+      return [...asPage<any>(open).items, ...asPage<any>(published).items]
+    },
+  })
   const move = useAction((v: { id: number; status: string }) => api.patch(`/content/${v.id}`, { status: v.status }), { invalidate: [['/content']] })
   if (!data) return <Loading />
   return (
