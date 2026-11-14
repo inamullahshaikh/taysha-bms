@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.approvals import check_refund
@@ -266,7 +266,7 @@ class OrderFilters:
     def __init__(self, date_from: date | None = None, date_to: date | None = None, status: OrderStatus | None = None,
                  payment_status: PaymentStatus | None = None, customer_id: int | None = None,
                  product_id: int | None = None, channel: str | None = None, order_type: OrderType | None = None,
-                 source: str | None = None, open_only: bool = False):
+                 source: str | None = None, open_only: bool = False, to_finish: bool = False):
         self.__dict__.update(locals())
         del self.__dict__["self"]
 
@@ -282,6 +282,9 @@ class OrderFilters:
             q = q.where(exists().where(OrderLine.order_id == Order.id, OrderLine.product_id == self.product_id))
         if self.open_only:
             q = q.where(Order.status.in_(("confirmed", "processing", "packed", "dispatched")))
+        if self.to_finish:  # open, or delivered with money still to collect
+            q = q.where(or_(Order.status.in_(("confirmed", "processing", "packed", "dispatched")),
+                            and_(Order.status == "delivered", Order.grand_total > Order.paid_total)))
         return q
 
 

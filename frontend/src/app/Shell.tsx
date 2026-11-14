@@ -1,11 +1,15 @@
 import logo from '../assets/logo.webp'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, ChevronsUpDown, KeyRound, LockKeyhole, LogOut, Menu as MenuIcon, X } from 'lucide-react'
+import {
+  Bell, CheckCheck, ChevronsUpDown, ClipboardList, House, KeyRound, LayoutGrid, LockKeyhole, LogOut, Menu as MenuIcon, Package, ShoppingBag,
+  Store, Tag, Users, Wallet, X, type LucideIcon,
+} from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ago } from '../lib/format'
+import { setSimple, useSimple } from '../lib/simple'
 import { cx, Empty, IconButton, Loading, Menu, MenuItem, PageHeader, Tabs } from '../ui/kit'
 import { SECTIONS } from '../modules'
 import { allowed, type Access, type Section } from './section'
@@ -28,7 +32,33 @@ export function useVisibleSections() {
   return SECTIONS.map((s) => ({ ...s, pages: s.pages.filter((p) => allowed(can, p.access)) })).filter((s) => s.pages.length)
 }
 
+/** The short menu in simple mode: the everyday jobs of a small team. */
+const SIMPLE_NAV: { to: string; label: string; icon: LucideIcon; access: Access }[] = [
+  { to: '/', label: 'Home', icon: House, access: '*' },
+  { to: '/quick/order', label: 'New order', icon: ShoppingBag, access: 'orders.create' },
+  { to: '/orders', label: 'Orders', icon: ClipboardList, access: 'orders' },
+  { to: '/pos', label: 'Stall sales', icon: Store, access: 'pos' },
+  { to: '/stock', label: 'Stock', icon: Package, access: 'inventory' },
+  { to: '/expenses', label: 'Expenses', icon: Wallet, access: ['expenses', 'expenses.create'] },
+  { to: '/customers', label: 'Customers', icon: Users, access: 'customers' },
+  { to: '/products', label: 'Products', icon: Tag, access: 'products' },
+  { to: '/approvals', label: 'Approvals', icon: CheckCheck, access: ['approvals.approve', 'expenses.approve', 'purchasing.approve'] },
+]
+
+const navCls = (active: boolean) => cx('group relative mb-0.5 flex items-center gap-3 rounded-lg px-2.5 transition-colors',
+  active ? 'bg-white/12 font-medium text-white' : 'text-cream/75 hover:bg-white/6 hover:text-cream')
+
+function SimpleLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const { can } = useAuth()
+  return SIMPLE_NAV.filter((l) => allowed(can, l.access)).map((l) => (
+    <NavLink key={l.to} to={l.to} end={l.to === '/'} onClick={onNavigate} className={({ isActive }) => cx(navCls(isActive), 'h-11 text-[15px]')}>
+      <l.icon className="size-5 shrink-0" strokeWidth={1.75} />{l.label}
+    </NavLink>
+  ))
+}
+
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const simple = useSimple()
   const sections = useVisibleSections()
   const { pathname } = useLocation()
   const current = sectionFor(pathname)
@@ -39,7 +69,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <img src={logo} alt="Taysha" className="h-8 w-auto" />
       </Link>
       <div className="scroll-quiet flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
-        {sections.map((s) => {
+        {simple ? <SimpleLinks onNavigate={onNavigate} /> : sections.map((s) => {
           const divider = lastGroup && s.group !== lastGroup
           lastGroup = s.group
           const active = current?.key === s.key
@@ -48,8 +78,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div key={s.key}>
               {divider && <div className="mx-2 my-2.5 h-px bg-white/10" />}
               <NavLink to={s.pages[0].path} onClick={onNavigate}
-                className={cx('group relative mb-0.5 flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] transition-colors',
-                  active ? 'bg-white/12 font-medium text-white' : 'text-cream/75 hover:bg-white/6 hover:text-cream')}>
+                className={cx(navCls(active), 'h-9 text-[13.5px]')}>
                 {active && <span className="absolute top-2 bottom-2 -left-3 w-[3px] rounded-r-full bg-cream" />}
                 <Icon className={cx('size-[18px] shrink-0', active ? 'text-cream' : 'text-cream/60 group-hover:text-cream/85')} strokeWidth={1.75} />
                 {s.label}
@@ -58,6 +87,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           )
         })}
       </div>
+      <button type="button" onClick={() => setSimple(!simple)}
+        className="mx-3 mb-2 flex items-center gap-2.5 rounded-lg border border-white/15 px-2.5 py-2 text-left text-[13px] text-cream/80 hover:bg-white/6 hover:text-cream">
+        {simple ? <LayoutGrid className="size-4 shrink-0" /> : <House className="size-4 shrink-0" />}
+        {simple ? 'Show all features' : 'Back to simple mode'}
+      </button>
       <UserChip onNavigate={onNavigate} />
     </nav>
   )
@@ -177,11 +211,12 @@ export function Shell() {
 /** Header + tabs for a section's pages. */
 export function SectionLayout({ section }: { section: Section }) {
   const { can } = useAuth()
+  const simple = useSimple()
   const pages = section.pages.filter((p) => allowed(can, p.access))
   return (
     <>
       <PageHeader title={section.label} subtitle={section.subtitle}>
-        {pages.length > 1 && <div className="mt-4"><Tabs tabs={pages.map((p) => ({ value: p.path, label: p.label, to: p.path }))} /></div>}
+        {pages.length > 1 && !simple && <div className="mt-4"><Tabs tabs={pages.map((p) => ({ value: p.path, label: p.label, to: p.path }))} /></div>}
       </PageHeader>
       <div className="anim-rise"><Outlet /></div>
     </>

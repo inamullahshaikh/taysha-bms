@@ -138,3 +138,15 @@ def test_order_pdfs(setup):
         assert r.status_code == 200 and r.content.startswith(b"%PDF")
     r = c.get(f"/orders/dispatch-list?ids={o1['id']},{o2['id']}")
     assert r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
+
+
+def test_to_finish_keeps_delivered_until_paid(setup):
+    c = setup["c"]
+    oid = c.post("/orders", json=order_body(setup, payment_method="cod", confirm=True)).json()["id"]
+    c.post("/orders", json=order_body(setup))  # draft: not listed
+    finish = lambda: [o["id"] for o in c.get("/orders?to_finish=true").json()["items"]]  # noqa: E731
+    assert finish() == [oid]
+    c.post(f"/orders/{oid}/status", json={"status": "delivered"})
+    assert finish() == [oid]  # delivered but cash not in yet
+    c.post(f"/orders/{oid}/payments", json={"method": "cod", "amount": "2360"})
+    assert finish() == []
