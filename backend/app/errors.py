@@ -12,6 +12,11 @@ class AppError(Exception):
         self.status, self.code, self.message, self.fields = status, code, message, fields
 
 
+class KeepChangesError(AppError):
+    """An error after which the work done so far in the request is still committed (e.g. an approval request
+    is saved, then the user is told approval is needed)."""
+
+
 def error_body(code: str, message: str, fields: dict | None = None) -> dict:
     return {"code": code, "message": message, "fields": fields or {}}
 

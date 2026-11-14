@@ -64,10 +64,15 @@ def _stamp_user(session: Session, *_):
 
 def get_db():
     """One transaction per request: commits after the endpoint returns, rolls back on any error."""
+    from app.errors import KeepChangesError
+
     db = SessionLocal()
     try:
         yield db
         db.commit()
+    except KeepChangesError:
+        db.commit()
+        raise
     except BaseException:
         db.rollback()
         raise

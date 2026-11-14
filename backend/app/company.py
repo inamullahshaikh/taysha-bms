@@ -52,6 +52,8 @@ class Company(Entity, Base):
     loyalty_points_per_100: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=Decimal(1), server_default="1")
     loyalty_point_value: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=Decimal(1), server_default="1")
     referral_bonus_points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    discount_approval_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))  # bigger discounts need approval
+    refund_approval_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # bigger refunds need approval
 
 
 class Branch(Entity, Base):
@@ -137,6 +139,8 @@ class CompanyIn(BaseModel):
     loyalty_points_per_100: Decimal | None = Field(None, ge=0)
     loyalty_point_value: Decimal | None = Field(None, ge=0)
     referral_bonus_points: int | None = Field(None, ge=0)
+    discount_approval_pct: Decimal | None = Field(None, ge=0, le=100)
+    refund_approval_amount: Decimal | None = Field(None, ge=0)
 
 
 class CompanyOut(CompanyIn):

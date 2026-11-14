@@ -11,6 +11,7 @@ from app.auth.models import User
 from app.auth.security import hash_password
 from app.config import settings
 from app.db import get_db
+from app.errors import KeepChangesError
 from app.main import app
 
 TEST_URL = settings.test_database_url
@@ -57,6 +58,9 @@ def client(db):
         try:
             yield db
             db.commit()
+        except KeepChangesError:
+            db.commit()
+            raise
         except BaseException:
             db.rollback()
             raise

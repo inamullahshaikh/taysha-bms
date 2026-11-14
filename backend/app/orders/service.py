@@ -220,8 +220,10 @@ def change_status(db: Session, order: Order, to: str, note: str | None = None) -
     frm = order.status
     now = utcnow()
     if to == "confirmed":
+        from app.approvals import check_order_discount
         from app.wholesale import check_credit
 
+        check_order_discount(db, order)
         check_credit(db, order)
         order.confirmed_at = now
         snapshot_costs(db, order)

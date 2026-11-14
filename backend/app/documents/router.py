@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.approvals import check_refund
 from app.audit import audit, snapshot
 from app.auth.access import require_access
 from app.auth.models import User
@@ -415,6 +416,7 @@ def pay_invoice(doc_id: int, body: PaymentIn, db: DB, _: User = PAY_CREATE):
     inv = get_doc(db, doc_id)
     if inv.doc_type != "invoice" or inv.status in ("draft", "cancelled"):
         raise AppError(409, "not_payable", "Payments are recorded against issued invoices")
+    check_refund(db, inv.order_id, inv.id, body)
     if body.status == "completed":
         if body.kind == "payment" and body.amount > inv.balance_due:
             raise AppError(422, "overpayment", f"Only {inv.balance_due} is due", {"amount": f"max {inv.balance_due}"})

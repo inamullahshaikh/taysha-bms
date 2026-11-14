@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
+from app.approvals import check_refund
 from app.audit import audit, snapshot
 from app.auth.access import require_access
 from app.auth.models import User
@@ -473,6 +474,7 @@ def list_payments(order_id: int, db: DB, _: User = PAY_VIEW):
 @router.post("/{order_id}/payments", response_model=PaymentOut, status_code=201)
 def add_payment(order_id: int, body: PaymentIn, db: DB, _: User = PAY_CREATE):
     o = get_order(db, order_id)
+    check_refund(db, o.id, None, body)
     if body.status == "completed":
         if body.kind == "payment":
             if o.status == "cancelled":
