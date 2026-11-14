@@ -1,0 +1,108 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource/bagel-fat-one';
+@import 'tailwindcss';
+
+/* Taysha brand (taysha.pk): wine #581C28 on cream #F6EBE2, Bagel Fat One display. */
+@theme {
+  --font-sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+  --font-display: 'Bagel Fat One', 'Inter Variable', sans-serif;
+
+  --color-wine-950: #2c0b12;
+  --color-wine-900: #3e1019;
+  --color-wine-800: #581c28;
+  --color-wine-700: #6e2533;
+  --color-wine-600: #8c2f45;
+  --color-wine-200: #ecc9cf;
+  --color-wine-100: #f6e4e6;
+  --color-wine-50: #fbf3f3;
+
+  --color-cream: #f6ebe2;
+  --color-page: #faf6f2;
+  --color-surface: #ffffff;
+  --color-sunken: #f5efe9;
+  --color-line: #ece3da;
+  --color-line-strong: #ddd0c4;
+
+  --color-ink: #1f1416;
+  --color-ink-2: #5e5254;
+  --color-muted: #8e8285;
+
+  /* Chart categorical slots, fixed order (validated: CVD ΔE ≥ 10, normal-vision ≥ 15 on white) */
+  --color-s1: #8c2f45;
+  --color-s2: #d9822b;
+  --color-s3: #1f8a70;
+  --color-s4: #3b6fb6;
+  --color-s5: #e0a526;
+  --color-s6: #c45c8a;
+
+  /* Status (always with a label) */
+  --color-good: #12805c;
+  --color-good-bg: #e5f4ec;
+  --color-warn: #a86400;
+  --color-warn-bg: #fdf1dc;
+  --color-bad: #c0392b;
+  --color-bad-bg: #fbe7e4;
+  --color-info: #2f5f9e;
+  --color-info-bg: #e7eef8;
+
+  --radius-card: 12px;
+  --shadow-card: 0 1px 2px rgb(62 16 25 / 0.04), 0 0 0 1px rgb(62 16 25 / 0.03);
+  --shadow-pop: 0 12px 32px -8px rgb(62 16 25 / 0.22), 0 0 0 1px rgb(62 16 25 / 0.06);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-page text-ink font-sans text-[14px] leading-5;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-wine-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--color-wine-200);
+  }
+  input[type='number']::-webkit-inner-spin-button {
+    opacity: 0.4;
+  }
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin, quiet scrollbars inside panels */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+.anim-rise {
+  animation: rise 0.18s ease-out;
+}
+.anim-slide {
+  animation: slide-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-slide {
+    animation: none;
+  }
+}
