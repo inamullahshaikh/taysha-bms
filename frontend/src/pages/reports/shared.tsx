@@ -23,7 +23,7 @@ export function useRange(fallback: Range = 'month') {
   const params: Record<string, string> = range === 'custom' && from && to ? { range, date_from: from, date_to: to } : { range: range === 'custom' ? fallback : range }
   const control = (
     <div className="flex flex-wrap items-center gap-2">
-      <Segmented options={RANGES} value={range as Range} onChange={setRange} />
+      <div className="scroll-quiet max-w-full overflow-x-auto"><Segmented options={RANGES} value={range as Range} onChange={setRange} /></div>
       {range === 'custom' && (
         <div className="flex items-center gap-1.5 text-[12.5px] text-muted">
           <Input type="date" aria-label="From" className="h-8 w-auto" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -78,7 +78,7 @@ export function SimpleTable<T = any>({ rows, cols, empty = 'No data for this per
             <tr key={i} onClick={onRow ? () => onRow(r) : undefined}
               className={cx('border-b border-line last:border-0', onRow && 'cursor-pointer hover:bg-wine-50/60')}>
               {cols.map((c) => (
-                <td key={c.key} className={cx('h-11 px-3 first:pl-4 last:pr-4', c.align === 'right' && 'tabular text-right whitespace-nowrap')}>
+                <td key={c.key} className={cx('h-11 px-3 first:min-w-44 first:pl-4 last:pr-4', c.align === 'right' && 'tabular text-right whitespace-nowrap')}>
                   {c.render ? c.render(r) : ((r as any)[c.key] ?? <span className="text-muted">—</span>)}
                 </td>
               ))}
