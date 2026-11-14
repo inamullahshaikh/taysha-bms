@@ -1,4 +1,8 @@
-"""Background jobs. Run by the `scheduler` container: python -m app.jobs --loop
+"""Background jobs.
+
+- On a server: the `scheduler` container keeps running: python -m app.jobs --loop
+- On Railway: a cron service runs `python -m app.jobs` every 15 minutes; it runs whatever is due and exits,
+  so nothing sits in memory between runs.
 
 Each job is idempotent and records its last run, so running it twice or late is harmless. A row lock means
 two scheduler processes never run the same job at once.
@@ -11,7 +15,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter
-from sqlalchemy import DateTime, String, Text, select
+from sqlalchemy import DateTime, String, Text, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -19,6 +23,7 @@ from app import models  # noqa: F401
 from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import utcnow
+from app.config import settings
 from app.db import DB, Base, SessionLocal
 
 
@@ -97,13 +102,32 @@ def _automation(db: Session) -> str:
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
-    return run_backup()
+    return run_backup() if settings.backups_enabled else "disabled (host snapshots volumes)"
 
 
 def _restore_check(db: Session) -> str:
     from app.backup import restore_check
 
-    return restore_check()
+    return restore_check() if settings.backups_enabled else "disabled (host snapshots volumes)"
+
+
+def _housekeeping(db: Session) -> str:
+    """Drop rows nobody will read again, so tables (and the paid disk under them) stop growing for nothing."""
+    from app.auth.models import UserSession
+    from app.integrations.shopify import SyncLog
+    from app.notifications import Notification
+
+    now = utcnow()
+    sessions = db.execute(delete(UserSession).where(
+        (UserSession.expires_at < now)
+        | (UserSession.last_seen_at < now - timedelta(minutes=settings.session_idle_minutes)))).rowcount
+    notes = db.execute(delete(Notification).where(
+        Notification.read_at.is_not(None), Notification.created_at < now - timedelta(days=90))).rowcount
+    # keep the rows (they make webhooks idempotent), drop the stored payloads of successful syncs
+    payloads = db.execute(update(SyncLog).where(
+        SyncLog.status == "ok", SyncLog.payload.is_not(None), SyncLog.at < now - timedelta(days=30))
+        .values(payload=None)).rowcount
+    return f"{sessions} sessions, {notes} notifications, {payloads} sync payloads removed"
 
 
 # name -> (interval, function(db) -> message). Modules add their jobs here.
@@ -122,6 +146,7 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),
     "backup": (timedelta(days=1), _backup),
     "restore_check": (timedelta(days=7), _restore_check),
+    "housekeeping": (timedelta(days=1), _housekeeping),
 }
 
 

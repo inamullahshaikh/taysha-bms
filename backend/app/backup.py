@@ -34,7 +34,7 @@ def run_backup(url: str | None = None, backup_dir: str | None = None) -> str:
     subprocess.run(["pg_dump", "--format=custom", "--no-owner", f"--file={dump}", libpq(url or settings.database_url)],
                    check=True, capture_output=True, text=True)
     uploads = Path(settings.upload_dir)
-    if uploads.exists():
+    if settings.backup_uploads and uploads.exists():
         with tarfile.open(out / f"uploads-{stamp}.tar.gz", "w:gz") as tar:
             tar.add(uploads, arcname="uploads")
     cutoff = datetime.now() - timedelta(days=settings.backup_retention_days)

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from fastapi import FastAPI, encoders
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
 
 from app import (  # noqa: F401
     approvals, assets, attachments, audit_router, automation, backup, barcodes, company, crm, customers, errors,
@@ -35,6 +36,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# JSON shrinks 5-20x (less egress, faster on phones). Level 6 is nearly as small as 9 for a fraction of the CPU.
+# PDFs and Excel files are already compressed inside, so they're sent as they are.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6, exclude_content_types=(
+    *DEFAULT_EXCLUDED_CONTENT_TYPES, "application/pdf",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
 errors.install(app)
 
 MODULES = (

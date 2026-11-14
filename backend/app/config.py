@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,6 +7,19 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://taysha:taysha@localhost:5433/taysha"
     test_database_url: str = "postgresql+psycopg://taysha:taysha@localhost:5433/taysha_test"
+
+    # Small pool: one web process serves a small team, and every idle Postgres connection costs server memory
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
+
+    @field_validator("database_url", "test_database_url")
+    @classmethod
+    def _psycopg(cls, v: str) -> str:
+        """Hosts like Railway hand out postgres:// or postgresql:// URLs; use the installed psycopg 3 driver."""
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     # Encrypts stored integration credentials. Set a long random value in production.
     secret_key: str = "dev-only-change-me"
@@ -25,6 +39,13 @@ class Settings(BaseSettings):
 
     backup_dir: str = "backups"
     backup_retention_days: int = 14
+    # Off where the host snapshots volumes itself (Railway): saves disk, CPU and the weekly restore test
+    backups_enabled: bool = True
+    # Daily archive of every uploaded file; each copy repeats files that never change, so it multiplies disk use
+    backup_uploads: bool = True
+
+    # Built frontend (index.html + assets). When set, app.web serves it next to the API (single service).
+    frontend_dir: str = ""
 
     timezone: str = "Asia/Karachi"
     currency: str = "PKR"

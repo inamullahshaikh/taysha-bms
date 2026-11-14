@@ -8,7 +8,10 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, declared_attr, mapp
 
 from app.config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+# pre_ping: survives the database restarting or dropping idle connections (e.g. after the app sleeps);
+# recycle: never keep a connection the server or a proxy may have silently closed
+engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=settings.db_pool_size,
+                       max_overflow=settings.db_max_overflow, pool_recycle=1800)
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 # Column types used everywhere: money never as float
