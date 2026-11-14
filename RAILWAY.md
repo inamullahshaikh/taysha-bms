@@ -92,9 +92,7 @@ railway config apply        # apply
 
 On Windows the package's CLI version check runs `$_`, which is the npm wrapper script, not the CLI itself. Point it
 at the real executable first, in PowerShell:
-`$env:_ = "$env:APPDATA
-pm
-ode_modules\@railway\cliinailway.exe"`.
+`$env:_ = "$env:APPDATA\npm\node_modules\@railway\cli\bin\railway.exe"`.
 
 ## What keeps the bill low
 
