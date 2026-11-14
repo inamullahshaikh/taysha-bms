@@ -45,7 +45,7 @@ export function StatTile({ label, value, delta, upIsGood = true, sub, to, spark 
       <p className="mt-2 text-[26px] leading-none font-semibold tracking-[-0.02em] text-ink">{value}</p>
       <div className="mt-auto flex items-end justify-between gap-3 pt-2">
         {sub ? <p className="text-[12px] text-muted">{sub}</p> : <span />}
-        {spark && spark.length > 1 && <Sparkline values={spark} />}
+        {spark && spark.length > 1 && <span className="hidden sm:block"><Sparkline values={spark} /></span>}
       </div>
     </div>
   )
@@ -207,7 +207,7 @@ export function SegmentBar({ parts, fmt = compact as Fmt }: { parts: { label: st
           )
         })}
       </div>
-      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12.5px] sm:grid-cols-3">
+      <ul className="mt-3 grid grid-cols-2 gap-x-5 gap-y-1.5 text-[12.5px]">
         {list.map((p, i) => (
           <li key={p.label} className="flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-ink-2">

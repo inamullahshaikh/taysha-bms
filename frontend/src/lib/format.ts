@@ -10,13 +10,14 @@ const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : 
 export function money(v: unknown, opts: { paisa?: boolean } = {}) {
   const n = num(v)
   if (n === null || Number.isNaN(n)) return '—'
-  return `Rs ${(opts.paisa ? PKR2 : PKR).format(n)}`
+  return `${n < 0 ? '−' : ''}Rs ${(opts.paisa ? PKR2 : PKR).format(Math.abs(n))}`
 }
 
 export function compactMoney(v: unknown) {
   const n = num(v)
   if (n === null || Number.isNaN(n)) return '—'
-  return `Rs ${Math.abs(n) >= 10000 ? COMPACT.format(n) : PKR.format(n)}`
+  const a = Math.abs(n)
+  return `${n < 0 ? '−' : ''}Rs ${a >= 10000 ? COMPACT.format(a) : PKR.format(a)}`
 }
 
 export const compact = (v: unknown) => {
