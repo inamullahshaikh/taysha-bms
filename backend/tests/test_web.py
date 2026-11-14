@@ -30,5 +30,8 @@ def test_single_service_serves_api_and_frontend(tmp_path, monkeypatch):
     assert "content-encoding" not in r.headers and r.text == "console.log(1)"
 
     assert c.get("/favicon.svg").headers["cache-control"] == "public, max-age=86400"
+    # phones only offer "Install app" when the manifest comes with its proper type
+    (tmp_path / "manifest.webmanifest").write_text("{}")
+    assert c.get("/manifest.webmanifest").headers["content-type"] == "application/manifest+json"
     # nothing outside the build folder is reachable
     assert c.get("/..%2F..%2Fetc%2Fpasswd").text == "<html>app</html>"

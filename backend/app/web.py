@@ -20,7 +20,8 @@ from app.config import settings
 from app.main import app as api
 
 for ext, mime in ((".js", "text/javascript"), (".css", "text/css"), (".svg", "image/svg+xml"),
-                  (".woff2", "font/woff2"), (".webp", "image/webp"), (".json", "application/json")):
+                  (".woff2", "font/woff2"), (".webp", "image/webp"), (".json", "application/json"),
+                  (".png", "image/png"), (".webmanifest", "application/manifest+json")):
     mimetypes.add_type(mime, ext)  # slim images ship without /etc/mime.types
 
 DIST = Path(settings.frontend_dir).resolve() if settings.frontend_dir else None

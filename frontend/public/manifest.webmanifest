@@ -1,0 +1,22 @@
+{
+  "name": "Taysha",
+  "short_name": "Taysha",
+  "description": "Orders, stock, batches and expenses for Taysha",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf6f2",
+  "theme_color": "#581C28",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New order", "url": "/quick/order", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Make a batch", "url": "/quick/batch", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Add expense", "url": "/quick/expense", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
