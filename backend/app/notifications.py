@@ -39,6 +39,7 @@ KINDS: dict[str, tuple[str, str, str]] = {
     "unusual_adjustment": ("Large stock write-off or adjustment", "inventory", "view"),
     "failed_sync": ("Integration sync failed", "settings", "view"),
     "follow_up": ("Customer follow-up due", "customers", "view"),
+    "task_overdue": ("Task overdue", "tasks", "view"),
 }
 EXPIRY_WARNING_DAYS = 14
 DISPATCH_DELAY_DAYS = 2
@@ -215,6 +216,22 @@ def check_alerts(db: Session) -> str:
                 st.active = True
             db.add(Notification(user_id=f.assigned_to_id, kind="follow_up", title=f"Follow-up due: {f.note[:80]}",
                                 link=f"/customers/{f.customer_id}" if f.customer_id else f"/leads/{f.lead_id}"))
+            sent += 1
+
+    # overdue tasks go to their assignee
+    from app.tasks import overdue_tasks
+
+    for task in overdue_tasks(db):
+        key = f"task_overdue:{task.id}"
+        found["task_overdue"].add(str(task.id))
+        st = db.get(AlertState, key)
+        if not (st and st.active) and prefs(db, task.assignee_id)["task_overdue"]["in_app"]:
+            if st is None:
+                db.add(AlertState(key=key, kind="task_overdue", active=True, last_sent_at=utcnow()))
+            else:
+                st.active = True
+            db.add(Notification(user_id=task.assignee_id, kind="task_overdue", title=f"Overdue: {task.title}",
+                                link=f"/tasks/{task.id}"))
             sent += 1
 
     # integration failures not yet resolved

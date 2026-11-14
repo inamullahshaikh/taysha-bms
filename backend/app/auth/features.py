@@ -36,6 +36,7 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "marketing": ("Marketing & campaigns", (V, E)),
     "accounting": ("Accounting, ledgers & budgets", (V, C, E, AP, X)),
     "partners": ("Partners & shareholders (confidential)", (V, E, AP)),
+    "tasks": ("Tasks & projects", (V, C, E, A, X)),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -71,4 +72,5 @@ ENTITY_FEATURE: dict[str, str] = {
     **{t: "customers" for t in ("leads", "follow_ups", "segments")},
     **{t: "accounting" for t in ("accounts", "journal_entries", "budgets")},
     **{t: "partners" for t in ("partners", "partner_transactions", "resolutions")},
+    **{t: "tasks" for t in ("projects", "tasks", "task_comments")},
 }

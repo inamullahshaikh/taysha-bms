@@ -387,6 +387,10 @@ def get_dashboard(user: CurrentUser, db: DB, range: Range = "month", date_from: 
         from app.marketing import marketing_dashboard
 
         out["marketing"] = marketing_dashboard(db, start, end)
+    if can(db, user, "tasks", "view"):
+        from app.tasks import overview
+
+        out["tasks"] = overview(db)
     if can(db, user, "production", "view"):
         out["production"] = production_metrics(db, start, end, can(db, user, "product_costs", "view"))
     if can(db, user, "orders", "view"):
