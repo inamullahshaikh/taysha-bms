@@ -298,6 +298,14 @@ def list_batches(db: DB, p: Annotated[ListParams, Depends()], product_id: int | 
     return page
 
 
+@router.get("/batches/{batch_id}", response_model=BatchOut)
+def get_batch(batch_id: int, db: DB, _: User = VIEW):
+    b = BatchOut.model_validate(get_or_404(db, Batch, batch_id, "Batch"))
+    b.on_hand = db.scalar(select(func.coalesce(func.sum(StockBalance.quantity), 0)).where(
+        StockBalance.batch_id == batch_id))
+    return b
+
+
 @router.patch("/batches/{batch_id}", response_model=BatchOut)
 def update_batch(batch_id: int, body: BatchPatch, db: DB, _: User = EDIT):
     """Hold / release / reject a batch. Held and rejected batches can't be sold or used."""

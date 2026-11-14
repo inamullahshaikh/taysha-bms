@@ -109,6 +109,7 @@ class ItemIn(BaseModel):
 class ItemOut(ItemIn):
     model_config = {"from_attributes": True}
     id: int
+    supplier_id: int
     product_sku: str = ""
     product_name: str = ""
 
