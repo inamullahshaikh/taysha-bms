@@ -2,10 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FlaskConical, Play, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, asPage } from '../../lib/api'
+import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { ago, label } from '../../lib/format'
-import { useAction, useRefMap } from '../../lib/hooks'
+import { useAction, useLookups, useRefMap } from '../../lib/hooks'
 import { DataTable } from '../../ui/DataTable'
 import { PRODUCTS, USERS, type FieldDef, type FormValues } from '../../ui/Form'
 import { Badge, Button, Checkbox, Field, Status } from '../../ui/kit'
@@ -105,7 +105,7 @@ function RuleDrawer({ rule, onClose }: { rule: any; onClose: () => void }) {
   const isNew = !rule.id
   const editable = can('automation', 'edit')
   const [userIds, setUserIds] = useState<number[]>(rule.action_params?.user_ids ?? [])
-  const users = useQuery({ queryKey: ['refmap-users-list'], queryFn: async () => asPage<any>(await api.get('/users', { page_size: 500, active: true })).items, retry: false })
+  const users = { data: useLookups().data?.users }
   const [test, setTest] = useState<any[] | null>(null)
   const runTest = useAction(() => api.post<any[]>(`/automation/rules/${rule.id}/test`), { onSuccess: (r) => setTest(r) })
   const run = useAction(() => api.post<{ actions: number }>(`/automation/rules/${rule.id}/run`), {

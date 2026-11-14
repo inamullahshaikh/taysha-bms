@@ -443,6 +443,7 @@ export default function Dashboard() {
     queryFn: () => api.get<Data>('/dashboard', params),
     enabled: !custom || (!!from && !!to),
     placeholderData: (prev) => prev,
+    staleTime: 2 * 60_000, // the heaviest call in the app; coming back to the dashboard reuses it
   })
   const layout = useQuery({ queryKey: ['/dashboard/layout'], queryFn: () => api.get<{ widgets: string[]; available: string[] }>('/dashboard/layout') })
 

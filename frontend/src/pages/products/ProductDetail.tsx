@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useCan } from '../../lib/auth'
 import { compact, compactMoney, date, label, month, qty } from '../../lib/format'
-import { useAction, useLookupName, useLookups } from '../../lib/hooks'
+import { useAction, useLookupName, useLookups, useRefMap } from '../../lib/hooks'
 import { ChartCard, TrendChart } from '../../ui/charts'
 import { DataTable } from '../../ui/DataTable'
 import { LineItems, type FormValues } from '../../ui/Form'
@@ -246,17 +246,10 @@ function StockTab({ id }: { id: number }) {
 }
 
 function Suppliers({ id }: { id: number }) {
-  // ponytail: GET /products/{id}/suppliers omits supplier_id, so read each supplier's item list (fine for tens of suppliers)
-  const { data, isLoading } = useQuery({
-    queryKey: ['product-suppliers', id],
-    queryFn: async () => {
-      const sups = (await api.get('/suppliers', { page_size: 500 })).items as any[]
-      const items = await Promise.all(sups.map(async (s) => ((await api.get<any[]>(`/suppliers/${s.id}/items`)) ?? [])
-        .filter((i) => i.product_id === id).map((i) => ({ ...i, supplier: s }))))
-      return items.flat()
-    },
-  })
-  if (isLoading) return <Loading />
+  const supplierName = useRefMap('/suppliers')
+  const items = useQuery({ queryKey: [`/products/${id}/suppliers`], queryFn: () => api.get<any[]>(`/products/${id}/suppliers`) })
+  const data = items.data?.map((i) => ({ ...i, supplier: { id: i.supplier_id, name: supplierName(i.supplier_id) } }))
+  if (items.isLoading) return <Loading />
   return (
     <Card title="Who supplies this" pad={false}>
       {!data?.length ? <Empty title="No suppliers linked">Link this item from a supplier’s page.</Empty> : (

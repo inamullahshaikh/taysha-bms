@@ -1,3 +1,4 @@
+import logo from '../assets/logo.webp'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -43,7 +44,7 @@ export function Login({ expired }: { expired?: boolean }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1fr_1.1fr]">
       <div className="relative hidden flex-col justify-between overflow-hidden bg-wine-800 p-12 text-cream lg:flex">
-        <img src="/logo.png" alt="Taysha" className="h-10 w-auto self-start" />
+        <img src={logo} alt="Taysha" className="h-10 w-auto self-start" />
         <div className="relative z-10 max-w-md">
           <p className="font-display text-[44px] leading-[1.05]">Every order, batch and rupee in one place.</p>
           <p className="mt-4 text-[15px] leading-relaxed text-cream/70">Sales, stock, production and the books for the Taysha team.</p>
@@ -53,7 +54,7 @@ export function Login({ expired }: { expired?: boolean }) {
       </div>
 
       <div className="flex flex-col items-center justify-center bg-page px-5 py-10">
-        <div className="mb-8 flex h-14 items-center rounded-xl bg-wine-800 px-4 lg:hidden"><img src="/logo.png" alt="Taysha" className="h-8" /></div>
+        <div className="mb-8 flex h-14 items-center rounded-xl bg-wine-800 px-4 lg:hidden"><img src={logo} alt="Taysha" className="h-8" /></div>
         <form onSubmit={submit} className="w-full max-w-[360px]">
           <h1 className="font-display text-[28px] text-wine-800">{step === 'password' ? 'Sign in' : 'Two-step check'}</h1>
           <p className="mt-1 mb-6 text-[13.5px] text-ink-2">

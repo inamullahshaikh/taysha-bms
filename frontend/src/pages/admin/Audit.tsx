@@ -1,10 +1,10 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ScrollText } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { dateTime, label } from '../../lib/format'
-import { useRefMap, useUrlState } from '../../lib/hooks'
+import { useLookups, useRefMap, useUrlState } from '../../lib/hooks'
 import { Button, cx, Empty, Input, Loading, Select } from '../../ui/kit'
 
 type Entry = { id: number; at: string; user_id: number | null; action: string; entity_type: string | null; entity_id: number | null; before: any; after: any; source: string; note: string | null }
@@ -110,8 +110,7 @@ function changes(e: Entry): string[] {
   return [...keys].filter((k) => !['updated_at', 'password_hash'].includes(k) && JSON.stringify(e.before?.[k]) !== JSON.stringify(e.after?.[k]))
 }
 
-/** People for the filter (empty without user-management access; the log still works). */
+/** People for the filter (names come with the shared lookups, no extra request). */
 function useRefMapList() {
-  const { data } = useQuery({ queryKey: ['/users', 'audit-filter'], queryFn: () => api.get('/users', { page_size: 500 }), retry: false })
-  return (data?.items ?? []).map((u: any) => ({ value: u.id, label: u.name }))
+  return (useLookups().data?.users ?? []).map((u) => ({ value: u.id, label: u.name ?? `#${u.id}` }))
 }

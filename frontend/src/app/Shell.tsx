@@ -1,3 +1,4 @@
+import logo from '../assets/logo.webp'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, ChevronsUpDown, KeyRound, LockKeyhole, LogOut, Menu as MenuIcon, X } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
@@ -35,7 +36,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex h-full flex-col bg-wine-800 text-cream" aria-label="Main">
       <Link to="/" onClick={onNavigate} className="flex h-16 shrink-0 items-center px-5">
-        <img src="/logo.png" alt="Taysha" className="h-8 w-auto" />
+        <img src={logo} alt="Taysha" className="h-8 w-auto" />
       </Link>
       <div className="scroll-quiet flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:rgb(255_255_255/0.15)_transparent]">
         {sections.map((s) => {
@@ -97,7 +98,10 @@ function Notifications() {
   const { data } = useQuery({
     queryKey: ['/notifications', 'bell'],
     queryFn: () => api.get<{ unread: number; items: any[] }>('/notifications', { limit: 12 }),
-    refetchInterval: 60_000,
+    // every 5 minutes while the tab is visible, and when someone comes back to it; hidden tabs never poll,
+    // so an idle office lets the server sleep
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: true,
   })
   const open = async (n: any) => {
     if (!n.read_at) await api.post(`/notifications/${n.id}/read`)
@@ -160,7 +164,7 @@ export function Shell() {
       )}
       <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-page/85 px-4 backdrop-blur-md lg:px-8">
         <IconButton label="Open menu" aria-expanded={open} className="lg:hidden" onClick={() => setOpen(true)}><MenuIcon className="size-5" /></IconButton>
-        <Link to="/" className="flex h-9 items-center rounded-lg bg-wine-800 px-2.5 lg:hidden"><img src="/logo.png" alt="Taysha" className="h-5" /></Link>
+        <Link to="/" className="flex h-9 items-center rounded-lg bg-wine-800 px-2.5 lg:hidden"><img src={logo} alt="Taysha" className="h-5" /></Link>
         <div className="ml-auto flex items-center gap-1"><Notifications /></div>
       </header>
       <main id="main" className="mx-auto max-w-[1440px] px-4 py-6 lg:px-8 lg:py-7">

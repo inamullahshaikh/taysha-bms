@@ -149,10 +149,17 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
   const kind = FROM_LOOKUPS[source.path]
   const lookups = useLookups()
   const local = kind ? (lookups.data?.[kind] ?? []) : null
+  // search once typing pauses, not on every keystroke
+  const [term, setTerm] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(q), 250)
+    return () => clearTimeout(t)
+  }, [q])
   const remote = useQuery({
-    queryKey: ['pick', source.path, q, source.params],
-    queryFn: async () => asPage(await api.get(source.path, { ...source.params, q, page_size: 20 })).items,
+    queryKey: ['pick', source.path, term, source.params],
+    queryFn: async () => asPage(await api.get(source.path, { ...source.params, q: term, page_size: 20 })).items,
     enabled: open && !kind,
+    placeholderData: (prev) => prev,
   })
   const results = local
     ? { data: local.filter((r) => toLabel(r).toLowerCase().includes(q.toLowerCase())).slice(0, 20), isLoading: lookups.isLoading }

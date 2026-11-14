@@ -15,7 +15,8 @@ export const FROM_LOOKUPS: Record<string, keyof Lookups> = { '/users': 'users', 
 
 /** Small dropdown lists any signed-in user may read. */
 export function useLookups() {
-  return useQuery({ queryKey: ['lookups'], queryFn: () => api.get<Lookups>('/lookups'), staleTime: 10 * 60_000 })
+  // reference lists barely change; settings saves invalidate everything anyway
+  return useQuery({ queryKey: ['lookups'], queryFn: () => api.get<Lookups>('/lookups'), staleTime: 30 * 60_000 })
 }
 
 export function useLookupName(kind: keyof Lookups) {
@@ -34,7 +35,7 @@ export function useRefMap(path: string, toLabel: (r: any) => string = (r) => r.n
   const { data } = useQuery({
     queryKey: ['refmap', path],
     queryFn: async () => asPage(await api.get(path, { page_size: 500 })).items,
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
     retry: false,
     enabled: !kind,
   })

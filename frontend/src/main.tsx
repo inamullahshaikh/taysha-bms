@@ -14,7 +14,9 @@ import './index.css'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // reuse anything fetched in the last minute (moving between tabs and back costs no requests);
+      // every save invalidates what it changed, so this never hides your own edits
+      staleTime: 60_000,
       refetchOnWindowFocus: false,
       retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2,
     },

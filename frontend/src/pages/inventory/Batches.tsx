@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Layers } from 'lucide-react'
 import { useParams } from 'react-router-dom'
-import { api, asPage } from '../../lib/api'
+import { api } from '../../lib/api'
 import { useCan } from '../../lib/auth'
 import { date, qty } from '../../lib/format'
 import { productLabel, useAction, useRefMap } from '../../lib/hooks'
@@ -53,10 +53,9 @@ export function BatchPage() {
   const can = useCan()
   const product = useRefMap('/products', productLabel)
   const supplier = useRefMap('/suppliers')
-  // ponytail: no GET /stock/batches/{id}; scan the list (fine for a few thousand batches), add the endpoint if that grows
   const { data: b, isLoading } = useQuery({
     queryKey: ['/stock/batches', 'one', id],
-    queryFn: async () => asPage<any>(await api.get('/stock/batches', { page_size: 500, include_archived: true })).items.find((x: any) => x.id === id),
+    queryFn: () => api.get<any>(`/stock/batches/${id}`).catch(() => null),
   })
   const set = useAction((status: string) => api.patch(`/stock/batches/${id}`, { status }), { success: 'Batch updated' })
   if (isLoading) return <Loading />

@@ -1,4 +1,5 @@
 /** fetch wrapper for the FastAPI backend. Errors arrive as {code, message, fields}. */
+import { shrinkPhotos } from './image'
 
 export const API = '/api'
 
@@ -35,7 +36,7 @@ export async function request<T = any>(method: string, path: string, body?: unkn
     method,
     credentials: 'include',
     headers: body === undefined || isForm ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? await shrinkPhotos(body) : JSON.stringify(body),
   })
   if (res.status === 204) return undefined as T
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : undefined
