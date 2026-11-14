@@ -90,7 +90,7 @@ export default function DocumentDetail() {
                     <th className="px-4 py-2 font-medium">Item</th>
                     <th className="px-3 py-2 text-right font-medium">Qty</th>
                     <th className="px-3 py-2 text-right font-medium">Price</th>
-                    <th className="px-3 py-2 text-right font-medium">Tax</th>
+                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Tax</th>
                     <th className="px-4 py-2 text-right font-medium">Total</th>
                   </tr>
                 </thead>
@@ -99,9 +99,9 @@ export default function DocumentDetail() {
                     <tr key={l.id} className="border-b border-line last:border-0">
                       <td className="px-4 py-2.5">{l.description}{l.sku && <span className="block text-[12px] text-muted">{l.sku}</span>}</td>
                       <td className="tabular px-3 py-2.5 text-right">{qty(l.quantity)}</td>
-                      <td className="tabular px-3 py-2.5 text-right">{money(l.unit_price, { paisa: true })}</td>
-                      <td className="tabular px-3 py-2.5 text-right">{Number(l.tax_rate)}%</td>
-                      <td className="tabular px-4 py-2.5 text-right">{money(l.line_total, { paisa: true })}</td>
+                      <td className="tabular px-3 py-2.5 text-right whitespace-nowrap">{money(l.unit_price, { paisa: true })}</td>
+                      <td className="tabular hidden px-3 py-2.5 text-right sm:table-cell">{Number(l.tax_rate)}%</td>
+                      <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{money(l.line_total, { paisa: true })}</td>
                     </tr>
                   ))}
                 </tbody>

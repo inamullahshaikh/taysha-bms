@@ -121,7 +121,7 @@ export default function OrderDetail() {
                     <th className="px-4 py-2 font-medium">Product</th>
                     <th className="px-3 py-2 text-right font-medium">Qty</th>
                     <th className="px-3 py-2 text-right font-medium">Price</th>
-                    <th className="px-3 py-2 text-right font-medium">Discount</th>
+                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Discount</th>
                     <th className="px-4 py-2 text-right font-medium">Total</th>
                   </tr>
                 </thead>
@@ -136,9 +136,9 @@ export default function OrderDetail() {
                         </span>
                       </td>
                       <td className="tabular px-3 py-2.5 text-right">{qty(l.quantity)}</td>
-                      <td className="tabular px-3 py-2.5 text-right">{money(l.unit_price, { paisa: true })}{l.price_overridden && <span className="block text-[11.5px] text-muted">list {money(l.list_price)}</span>}</td>
-                      <td className="tabular px-3 py-2.5 text-right">{Number(l.line_discount) + Number(l.order_discount_share) ? money(Number(l.line_discount) + Number(l.order_discount_share), { paisa: true }) : '—'}</td>
-                      <td className="tabular px-4 py-2.5 text-right">{money(l.line_total, { paisa: true })}</td>
+                      <td className="tabular px-3 py-2.5 text-right whitespace-nowrap">{money(l.unit_price, { paisa: true })}{l.price_overridden && <span className="block text-[11.5px] text-muted">list {money(l.list_price)}</span>}</td>
+                      <td className="tabular hidden px-3 py-2.5 text-right sm:table-cell">{Number(l.line_discount) + Number(l.order_discount_share) ? money(Number(l.line_discount) + Number(l.order_discount_share), { paisa: true }) : '—'}</td>
+                      <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{money(l.line_total, { paisa: true })}</td>
                     </tr>
                   ))}
                 </tbody>
