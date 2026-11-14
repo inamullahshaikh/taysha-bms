@@ -57,8 +57,11 @@ export function IconButton({ label, className, children, ...p }: ButtonHTMLAttri
 
 /* ---------- Form controls ---------- */
 
+/** A width class passed by the caller (w-40, w-auto…) replaces the default full width. */
+const width = (className?: string) => (className && /(^|\s)(\w+:)?w-/.test(className) ? '' : 'w-full')
+
 const control =
-  'h-9 w-full rounded-lg border border-line-strong bg-surface px-3 text-[13.5px] text-ink placeholder:text-muted transition focus:border-wine-600 focus:outline-none focus:ring-3 focus:ring-wine-100 disabled:bg-sunken disabled:text-ink-2 aria-invalid:border-bad'
+  'h-9 rounded-lg border border-line-strong bg-surface px-3 text-[13.5px] text-ink placeholder:text-muted transition focus:border-wine-600 focus:outline-none focus:ring-3 focus:ring-wine-100 disabled:bg-sunken disabled:text-ink-2 aria-invalid:border-bad'
 
 export function Field({ label, error, hint, children, className, htmlFor }: {
   label?: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; className?: string; htmlFor?: string
@@ -73,11 +76,11 @@ export function Field({ label, error, hint, children, className, htmlFor }: {
 }
 
 export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => (
-  <input className={cx(control, p.type === 'number' && 'tabular', className)} {...p} />
+  <input className={cx(control, width(className), p.type === 'number' && 'tabular', className)} {...p} />
 )
 
 export const Textarea = ({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea className={cx(control, 'h-auto min-h-20 py-2', className)} {...p} />
+  <textarea className={cx(control, width(className), 'h-auto min-h-20 py-2', className)} {...p} />
 )
 
 export function Select({ className, options, placeholder, ...p }: SelectHTMLAttributes<HTMLSelectElement> & {
@@ -85,7 +88,7 @@ export function Select({ className, options, placeholder, ...p }: SelectHTMLAttr
   placeholder?: string
 }) {
   return (
-    <select className={cx(control, 'appearance-none bg-[length:16px] bg-[right_8px_center] bg-no-repeat pr-8', className)}
+    <select className={cx(control, width(className), 'appearance-none bg-[length:16px] bg-[right_8px_center] bg-no-repeat pr-8', className)}
       style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8285' stroke-width='2'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E\")" }}
       {...p}
     >
@@ -366,7 +369,7 @@ export function Segmented<T extends string>({ options, value, onChange }: {
     <div className="inline-flex rounded-lg bg-sunken p-0.5" role="radiogroup">
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
-          className={cx('h-7 rounded-md px-2.5 text-[12.5px] font-medium transition',
+          className={cx('h-7 rounded-md px-2.5 text-[12.5px] font-medium whitespace-nowrap transition',
             value === o.value ? 'bg-surface text-ink shadow-card' : 'text-ink-2 hover:text-ink')}>
           {o.label}
         </button>

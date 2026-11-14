@@ -135,12 +135,12 @@ export function History({ entity, id }: { entity: string; id: number }) {
               <li key={e.id} className="relative border-l border-line pb-3.5 pl-4 last:pb-0">
                 <span className="absolute top-1.5 -left-[4.5px] size-2 rounded-full bg-wine-200 ring-2 ring-surface" />
                 <p className="text-[13px] text-ink">
-                  <span className="font-medium">{e.user_id ? userName(e.user_id) : e.source === 'system' ? 'System' : label(e.source)}</span>{' '}
+                  <span className="font-medium">{e.user_id ? userName(e.user_id) : e.source === 'manual' || e.source === 'system' ? 'System' : label(e.source)}</span>{' '}
                   {label(e.action).toLowerCase()}
                   {changed.length > 0 && <span className="text-ink-2"> {changed.slice(0, 3).map((k) => label(k).toLowerCase()).join(', ')}{changed.length > 3 && ` +${changed.length - 3}`}</span>}
                 </p>
                 {e.note && <p className="text-[12px] text-ink-2">{e.note}</p>}
-                <p className="text-[11.5px] text-muted" title={dateTime(e.at)}>{ago(e.at)}{e.source !== 'web' && e.source !== 'system' ? ` · ${label(e.source)}` : ''}</p>
+                <p className="text-[11.5px] text-muted" title={dateTime(e.at)}>{ago(e.at)}{!['web', 'manual', 'system'].includes(e.source) ?` · ${label(e.source)}` : ''}</p>
               </li>
             )
           })}
