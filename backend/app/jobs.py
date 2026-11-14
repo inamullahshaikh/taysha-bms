@@ -88,6 +88,12 @@ def _scheduled_reports(db: Session) -> str:
     return run_scheduled(db)
 
 
+def _automation(db: Session) -> str:
+    from app.automation import run_all
+
+    return run_all(db)
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -110,6 +116,7 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "ledger_posting": (timedelta(minutes=5), _post_ledger),
     "depreciation": (timedelta(days=1), _depreciation),
     "scheduled_reports": (timedelta(hours=1), _scheduled_reports),
+    "automation": (timedelta(minutes=10), _automation),
     "shopify_orders": (timedelta(minutes=15), _shopify("poll_orders")),
     "shopify_stock": (timedelta(minutes=10), _shopify("push_stock")),
     "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),
