@@ -1,7 +1,6 @@
 import { ShoppingBag } from 'lucide-react'
 import { lazy } from 'react'
 import type { Section } from '../app/section'
-import { Stub } from './_stub'
 
 const Orders = lazy(() => import('../pages/sales/Orders'))
 const OrderForm = lazy(() => import('../pages/sales/OrderForm'))
@@ -15,6 +14,9 @@ const Returns = lazy(() => import('../pages/sales/Returns'))
 const ReturnDetail = lazy(() => import('../pages/sales/Returns').then((m) => ({ default: m.ReturnDetail })))
 const Complaints = lazy(() => import('../pages/sales/Complaints'))
 const DiscountCodes = lazy(() => import('../pages/sales/DiscountCodes'))
+const Wholesale = lazy(() => import('../pages/sales/Wholesale'))
+const Deliveries = lazy(() => import('../pages/sales/Deliveries'))
+const RouteDetail = lazy(() => import('../pages/sales/Deliveries').then((m) => ({ default: m.RouteDetail })))
 
 export const sales: Section = {
   key: 'sales', label: 'Sales', icon: ShoppingBag, group: 'ops',
@@ -25,8 +27,8 @@ export const sales: Section = {
     { path: '/returns', label: 'Returns', access: 'returns', element: <Returns /> },
     { path: '/complaints', label: 'Complaints', access: 'complaints', element: <Complaints /> },
     { path: '/discount-codes', label: 'Discount codes', access: 'discount_codes', element: <DiscountCodes /> },
-    { path: '/recurring-orders', label: 'Wholesale', access: 'orders', element: <Stub name="Wholesale" /> },
-    { path: '/routes', label: 'Deliveries', access: 'distribution', element: <Stub name="Deliveries" /> },
+    { path: '/recurring-orders', label: 'Wholesale', access: 'orders', element: <Wholesale /> },
+    { path: '/routes', label: 'Deliveries', access: 'distribution', element: <Deliveries /> },
   ],
   routes: [
     { path: '/orders/new', label: 'New order', access: 'orders.create', element: <OrderForm /> },
@@ -37,6 +39,6 @@ export const sales: Section = {
     { path: '/documents/:id', label: 'Document', access: 'invoices', element: <DocumentDetail /> },
     { path: '/customers/:id', label: 'Customer', access: 'customers', element: <CustomerDetail /> },
     { path: '/returns/:id', label: 'Return', access: 'returns', element: <ReturnDetail /> },
-    { path: '/routes/:id', label: 'Route', access: 'distribution', element: <Stub name="Route" /> },
+    { path: '/routes/:id', label: 'Route', access: 'distribution', element: <RouteDetail /> },
   ],
 }
