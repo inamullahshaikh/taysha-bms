@@ -150,7 +150,20 @@ def run_job(name: str, force: bool = False) -> str | None:
         return msg
 
 
+def schema_ready() -> bool:
+    """Jobs wait until the API has applied all migrations (they start at the same time on deploy)."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+    with SessionLocal() as db:
+        return MigrationContext.configure(db.connection()).get_current_revision() == head
+
+
 def run_due() -> None:
+    if not schema_ready():
+        return
     for name in JOBS:
         run_job(name)
 
