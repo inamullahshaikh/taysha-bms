@@ -18,7 +18,9 @@ const queryClient = new QueryClient({
       // every save invalidates what it changed, so this never hides your own edits
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2,
+      // 4xx are answers, never retried. Server/network errors get 4 tries over ~15 s: long enough for a
+      // sleeping server to wake up (the first request can fail while it starts). Saves are never retried.
+      retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 4,
     },
   },
 })
