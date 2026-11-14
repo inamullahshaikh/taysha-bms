@@ -23,3 +23,4 @@ from app import records  # noqa: F401
 from app import assets  # noqa: F401
 from app import insights  # noqa: F401
 from app import forecast  # noqa: F401
+from app import rnd  # noqa: F401
