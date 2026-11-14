@@ -65,7 +65,7 @@ export default function Approvals() {
   return (
     <div className="flex flex-col gap-3">
       {types.length > 1 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto [&_button]:whitespace-nowrap">
           <Segmented value={type} onChange={setType}
             options={[{ value: 'all', label: `All ${items.length}` }, ...types.map((t) => ({ value: t, label: `${TYPE[t] ?? t} ${items.filter((i) => i.type === t).length}` }))]} />
         </div>
@@ -73,17 +73,17 @@ export default function Approvals() {
       <ul className="divide-y divide-line rounded-card bg-surface shadow-card">
         {shown.map((i) => (
           <li key={`${i.type}-${i.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+            <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <Badge tone="brand">{TYPE[i.type] ?? i.type}</Badge>
-                <Link to={i.link} className="truncate text-[13.5px] font-medium text-ink hover:text-wine-800">{i.title}</Link>
+                <Link to={i.link} className="min-w-0 text-[13.5px] font-medium text-ink hover:text-wine-800">{i.title}</Link>
               </div>
               <p className="mt-1 text-[12.5px] text-muted">
                 {i.requested_by_id ? userName(i.requested_by_id) : 'System'} · {ago(i.requested_at)}
               </p>
             </div>
             {i.amount != null && <p className="tabular text-[15px] font-semibold text-ink">{money(i.amount)}</p>}
-            <div className="flex gap-2">
+            <div className="ml-auto flex gap-2 sm:ml-0">
               <Button size="sm" icon={<X className="size-4" />} onClick={() => setDeciding({ item: i, verb: 'reject' })}>Reject</Button>
               <Button size="sm" variant="primary" icon={<Check className="size-4" />} onClick={() => setDeciding({ item: i, verb: 'approve' })}>Approve</Button>
             </div>

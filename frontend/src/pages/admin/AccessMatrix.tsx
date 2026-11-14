@@ -100,18 +100,18 @@ export function AccessMatrix({ userId, isOwner }: { userId: number; isOwner: boo
   }
 
   return (
-    <Card title="Access" pad={false}
-      action={editable && (
-        <div className="flex items-center gap-2">
-          <div className="w-56"><RecordSelect source={{ path: '/users', params: { active: true } }} value={copyFrom} onChange={setCopyFrom} placeholder="Copy access from…" /></div>
+    <Card title="Access" pad={false}>
+      {editable && (
+        <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+          <div className="min-w-0 flex-1 sm:max-w-64"><RecordSelect source={{ path: '/users', params: { active: true } }} value={copyFrom} onChange={setCopyFrom} placeholder="Copy access from…" /></div>
           <Button size="sm" icon={<Copy className="size-3.5" />} disabled={!copyFrom || Number(copyFrom) === userId} onClick={() => setConfirmCopy(true)}>Copy</Button>
         </div>
-      )}>
+      )}
       <div className="scroll-quiet max-h-[70vh] overflow-auto">
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead className="sticky top-0 z-10 bg-surface">
             <tr>
-              <th scope="col" className="border-b border-line px-4 py-2.5 text-left text-[12px] font-medium text-muted">Feature</th>
+              <th scope="col" className="min-w-40 border-b border-line px-4 py-2.5 text-left text-[12px] font-medium text-muted">Feature</th>
               {ACTIONS.map((a) => (
                 <th key={a} scope="col" className="w-20 border-b border-line px-1 py-2 text-center text-[12px] font-medium text-muted">
                   {editable ? (
