@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import and_, exists, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
 from app.accounting.models import Account, JournalEntry, JournalLine
@@ -114,11 +114,15 @@ def sale_lines(customer_id, net, tax, charges, rounding, grand, revenue_acct="40
             ("4010", 0, charges * s, c), ("4900", 0, rounding * s, c)]
 
 
-def post_orders(db: Session) -> int:
+def pending_orders():
     from app.orders.models import Order
 
+    return select(Order).where(Order.dispatched_at.is_not(None), not_posted(Order, "order"))
+
+
+def post_orders(db: Session) -> int:
     n = 0
-    for o in db.scalars(select(Order).where(Order.dispatched_at.is_not(None), not_posted(Order, "order"))):
+    for o in db.scalars(pending_orders()):
         post_entry(db, local_date(o.dispatched_at),
                    sale_lines(o.customer_id, o.net_total, o.tax_total, o.delivery_charge, o.rounding, o.grand_total),
                    f"Sale {o.number}", ("order", o.id))
@@ -126,14 +130,24 @@ def post_orders(db: Session) -> int:
     return n
 
 
-def post_documents(db: Session) -> int:
+def pending_documents():
     from app.documents.models import SalesDocument as D
 
+    return select(D).where(D.status.not_in(("draft", "cancelled")), not_posted(D, "sales_document"),
+                           (D.doc_type.in_(("credit_note", "debit_note")))
+                           | and_(D.doc_type == "invoice", D.order_id.is_(None)))
+
+
+def pending_document_cancels():
+    from app.documents.models import SalesDocument as D
+
+    return select(D).where(D.status == "cancelled", posted_main("sales_document", D),
+                           not_posted(D, "sales_document", "reverse"))
+
+
+def post_documents(db: Session) -> int:
     n = 0
-    live = D.status.not_in(("draft", "cancelled"))
-    q = select(D).where(live, not_posted(D, "sales_document"), (D.doc_type.in_(("credit_note", "debit_note")))
-                        | and_(D.doc_type == "invoice", D.order_id.is_(None)))
-    for d in db.scalars(q):
+    for d in db.scalars(pending_documents()):
         if d.doc_type == "credit_note":
             c = {"customer_id": d.customer_id}
             lines = [("4020", d.net_total, 0, c), ("2100", d.tax_total, 0, c), ("4010", d.charges_total, 0, c),
@@ -144,8 +158,7 @@ def post_documents(db: Session) -> int:
                    ("sales_document", d.id))
         n += 1
     # cancelled after posting -> reverse
-    for d in db.scalars(select(D).where(D.status == "cancelled", posted_main("sales_document", D),
-                                        not_posted(D, "sales_document", "reverse"))):
+    for d in db.scalars(pending_document_cancels()):
         main = db.scalar(select(JournalEntry).where(JournalEntry.source_type == "sales_document",
                                                     JournalEntry.source_id == d.id, JournalEntry.kind == "main"))
         reverse(db, main, memo=f"{d.number} cancelled")
@@ -153,15 +166,20 @@ def post_documents(db: Session) -> int:
     return n
 
 
+def pending_returns():
+    from app.returns import ReturnRequest
+
+    return select(ReturnRequest).where(ReturnRequest.status == "completed", ReturnRequest.resolution == "refund",
+                                       not_posted(ReturnRequest, "return"))
+
+
 def post_returns(db: Session) -> int:
     """Refunded returns reverse the sale for the returned goods (credit notes post themselves)."""
     from app.orders.models import Order, OrderLine
-    from app.returns import ReturnLine, ReturnRequest
+    from app.returns import ReturnLine
 
     n = 0
-    for r in db.scalars(select(ReturnRequest).where(ReturnRequest.status == "completed",
-                                                    ReturnRequest.resolution == "refund",
-                                                    not_posted(ReturnRequest, "return"))):
+    for r in db.scalars(pending_returns()):
         net = tax = ZERO
         for rl in db.scalars(select(ReturnLine).where(ReturnLine.return_id == r.id)):
             ol = db.get(OrderLine, rl.order_line_id)
@@ -176,11 +194,15 @@ def post_returns(db: Session) -> int:
     return n
 
 
-def post_payments(db: Session) -> int:
+def pending_payments():
     from app.orders.models import Payment
 
+    return select(Payment).where(Payment.status == "completed", not_posted(Payment, "payment"))
+
+
+def post_payments(db: Session) -> int:
     n = 0
-    for p in db.scalars(select(Payment).where(Payment.status == "completed", not_posted(Payment, "payment"))):
+    for p in db.scalars(pending_payments()):
         c = {"customer_id": p.customer_id}
         cash = CASH_ACCOUNT.get(p.method, "1010")
         lines = [(cash, p.amount, 0, c), ("1100", 0, p.amount, c)]
@@ -191,12 +213,17 @@ def post_payments(db: Session) -> int:
     return n
 
 
+def pending_stock():
+    from app.inventory.models import StockMovement as M
+
+    return select(M).where(M.unit_cost.is_not(None), M.unit_cost != 0, not_posted(M, "stock_movement"))
+
+
 def post_stock(db: Session) -> int:
     from app.inventory.models import StockMovement as M
 
     n = 0
-    for m in db.scalars(select(M).where(M.unit_cost.is_not(None), M.unit_cost != 0, not_posted(M, "stock_movement"))
-                        .order_by(M.id)):
+    for m in db.scalars(pending_stock().order_by(M.id)):
         value = money(abs(m.quantity) * m.unit_cost)
         counter = STOCK_COUNTER.get(m.reason, "5030")
         lines = [("1200", value, 0, {}), (counter, 0, value, {})] if m.quantity > 0 else \
@@ -207,12 +234,16 @@ def post_stock(db: Session) -> int:
     return n
 
 
-def post_production(db: Session) -> int:
-    """Labour and overhead added to finished goods cost are moved out of P&L into work in progress."""
+def pending_production():
     from app.production.models import ProductionOrder as P
 
+    return select(P).where(P.status == "completed", not_posted(P, "production_order"))
+
+
+def post_production(db: Session) -> int:
+    """Labour and overhead added to finished goods cost are moved out of P&L into work in progress."""
     n = 0
-    for p in db.scalars(select(P).where(P.status == "completed", not_posted(P, "production_order"))):
+    for p in db.scalars(pending_production()):
         absorbed = (p.labour_cost or ZERO) + (p.overhead_cost or ZERO)
         post_entry(db, local_date(p.completed_at), [("1220", absorbed, 0, {}), ("5040", 0, absorbed, {})],
                    f"Labour & overhead {p.number}", ("production_order", p.id))
@@ -220,11 +251,30 @@ def post_production(db: Session) -> int:
     return n
 
 
+def pending_bills():
+    from app.purchasing.models import SupplierBill as B
+
+    return select(B).where(B.status != "cancelled", not_posted(B, "supplier_bill"))
+
+
+def pending_bill_cancels():
+    from app.purchasing.models import SupplierBill as B
+
+    return select(B).where(B.status == "cancelled", posted_main("supplier_bill", B),
+                           not_posted(B, "supplier_bill", "reverse"))
+
+
+def pending_supplier_payments():
+    from app.purchasing.models import SupplierPayment as SP
+
+    return select(SP).where(not_posted(SP, "supplier_payment"))
+
+
 def post_bills(db: Session) -> int:
-    from app.purchasing.models import SupplierBill as B, SupplierBillLine, SupplierPayment as SP
+    from app.purchasing.models import SupplierBillLine
 
     n = 0
-    for b in db.scalars(select(B).where(B.status != "cancelled", not_posted(B, "supplier_bill"))):
+    for b in db.scalars(pending_bills()):
         s = {"supplier_id": b.supplier_id}
         by_acct: dict[str, Decimal] = defaultdict(lambda: ZERO)
         for ln in db.scalars(select(SupplierBillLine).where(SupplierBillLine.bill_id == b.id)):
@@ -234,13 +284,12 @@ def post_bills(db: Session) -> int:
                   ("2110", 0, b.withholding_tax, s)]
         post_entry(db, b.bill_date, lines, f"Supplier bill {b.number}", ("supplier_bill", b.id))
         n += 1
-    for b in db.scalars(select(B).where(B.status == "cancelled", posted_main("supplier_bill", B),
-                                        not_posted(B, "supplier_bill", "reverse"))):
+    for b in db.scalars(pending_bill_cancels()):
         main = db.scalar(select(JournalEntry).where(JournalEntry.source_type == "supplier_bill",
                                                     JournalEntry.source_id == b.id, JournalEntry.kind == "main"))
         reverse(db, main, memo=f"{b.number} cancelled")
         n += 1
-    for p in db.scalars(select(SP).where(not_posted(SP, "supplier_payment"))):
+    for p in db.scalars(pending_supplier_payments()):
         s = {"supplier_id": p.supplier_id}
         post_entry(db, p.payment_date, [("2000", p.amount, 0, s), (CASH_ACCOUNT.get(p.method, "1010"), 0, p.amount, s)],
                    f"Supplier payment {p.number}", ("supplier_payment", p.id))
@@ -248,11 +297,17 @@ def post_bills(db: Session) -> int:
     return n
 
 
+def pending_expenses():
+    from app.expenses import Expense
+
+    return select(Expense).where(Expense.status == "approved", not_posted(Expense, "expense"))
+
+
 def post_expenses(db: Session) -> int:
-    from app.expenses import Expense, ExpenseCategory
+    from app.expenses import ExpenseCategory
 
     n = 0
-    for e in db.scalars(select(Expense).where(Expense.status == "approved", not_posted(Expense, "expense"))):
+    for e in db.scalars(pending_expenses()):
         cat = db.get(ExpenseCategory, e.category_id)
         acct = cat.account_id or "6000"
         paid_from = CASH_ACCOUNT.get(e.payment_method, "2200") if e.payment_method else "2200"
@@ -268,9 +323,14 @@ POSTERS = (post_orders, post_documents, post_returns, post_payments, post_stock,
            post_expenses)
 
 
+PENDING = (pending_orders, pending_documents, pending_document_cancels, pending_returns, pending_payments,
+           pending_stock, pending_production, pending_bills, pending_bill_cancels, pending_supplier_payments,
+           pending_expenses)
+
+
 def post_pending(db: Session) -> dict[str, int]:
-    out = {}
-    for fn in POSTERS:
-        with db.begin_nested():
-            out[fn.__name__.removeprefix("post_")] = fn(db)
-    return out
+    """Runs before every report, so the usual case (nothing new) is one EXISTS probe instead of every poster."""
+    if not db.scalar(select(or_(*(q().exists() for q in PENDING)))):
+        return {fn.__name__.removeprefix("post_"): 0 for fn in POSTERS}
+    # no per-poster savepoint: an error propagates and the caller's transaction rolls back as a whole
+    return {fn.__name__.removeprefix("post_"): fn(db) for fn in POSTERS}

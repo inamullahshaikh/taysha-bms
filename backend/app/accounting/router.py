@@ -71,14 +71,25 @@ class JEOut(RecordOut):
     lines: list[dict] = []
 
 
+def je_outs(db: Session, entries: list[JournalEntry]) -> list[JEOut]:
+    """Entries with their lines, all lines in one query."""
+    lines: dict[int, list[dict]] = {e.id: [] for e in entries}
+    for ln, a in db.execute(select(JournalLine, Account).join(Account)
+                            .where(JournalLine.entry_id.in_(lines)).order_by(JournalLine.id)):
+        lines[ln.entry_id].append({
+            "account_id": ln.account_id, "account": f"{a.code} {a.name}", "debit": ln.debit, "credit": ln.credit,
+            "customer_id": ln.customer_id, "supplier_id": ln.supplier_id, "cost_centre_id": ln.cost_centre_id,
+            "memo": ln.memo})
+    out = []
+    for e in entries:
+        o = JEOut.model_validate(e)
+        o.lines = lines[e.id]
+        out.append(o)
+    return out
+
+
 def je_out(db: Session, e: JournalEntry) -> JEOut:
-    o = JEOut.model_validate(e)
-    o.lines = [{"account_id": ln.account_id, "account": f"{a.code} {a.name}", "debit": ln.debit, "credit": ln.credit,
-                "customer_id": ln.customer_id, "supplier_id": ln.supplier_id, "cost_centre_id": ln.cost_centre_id,
-                "memo": ln.memo}
-               for ln, a in db.execute(select(JournalLine, Account).join(Account)
-                                       .where(JournalLine.entry_id == e.id).order_by(JournalLine.id))]
-    return o
+    return je_outs(db, [e])[0]
 
 
 @router.post("/sync")
@@ -106,7 +117,7 @@ def list_journal(db: DB, p: Annotated[ListParams, Depends()], date_from: date | 
     if manual_only:
         q = q.where(JournalEntry.is_manual)
     page = paginate(db, q, p)
-    page["items"] = [je_out(db, e) for e in page["items"]]
+    page["items"] = je_outs(db, page["items"])
     return page
 
 
@@ -288,11 +299,14 @@ def cash_flow(db: DB, range: Range = "month", date_from: date | None = None, dat
                                 JournalEntry.entry_date <= until))
 
     groups: dict[str, dict[str, Decimal]] = {"operating": {}, "investing": {}, "financing": {}}
-    entries = db.scalars(select(JournalEntry.id).where(
+    entries = select(JournalEntry.id).where(
         JournalEntry.status == "posted", JournalEntry.entry_date.between(start, end),
-        JournalEntry.id.in_(select(JournalLine.entry_id).where(JournalLine.account_id.in_(cash_ids))))).all()
-    for eid in entries:
-        lines = db.scalars(select(JournalLine).where(JournalLine.entry_id == eid)).all()
+        JournalEntry.id.in_(select(JournalLine.entry_id).where(JournalLine.account_id.in_(cash_ids))))
+    by_entry: dict[int, list[JournalLine]] = {}
+    for ln in db.scalars(select(JournalLine).where(JournalLine.entry_id.in_(entries))
+                         .order_by(JournalLine.entry_id, JournalLine.id)):
+        by_entry.setdefault(ln.entry_id, []).append(ln)
+    for lines in by_entry.values():
         cash = sum((ln.debit - ln.credit for ln in lines if ln.account_id in cash_ids), ZERO)
         others = [ln for ln in lines if ln.account_id not in cash_ids]
         if not others or cash == 0:
