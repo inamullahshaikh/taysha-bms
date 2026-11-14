@@ -24,8 +24,8 @@ from app.production.models import (
     DEFAULT_STAGES, ProductionMaterial, ProductionOrder, ProductionStage, Recipe, RecipeLine,
 )
 from app.production.service import (
-    availability, availability_many, complete, issue_materials, materials, release, requirements, reserve,
-    round_up_batches, standard_cost,
+    availability, availability_many, complete, issue_materials, release, requirements, reserve, round_up_batches,
+    standard_cost,
 )
 from app.products.models import Product
 

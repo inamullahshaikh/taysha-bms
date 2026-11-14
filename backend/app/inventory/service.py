@@ -78,8 +78,31 @@ def available(db: Session, product_id: int, warehouse_id: int) -> Decimal:
     return on_hand(db, product_id, warehouse_id, usable_only=True) - reserved(db, product_id, warehouse_id)
 
 
+def levels(db: Session, pairs: set[tuple[int, int]]) -> dict[tuple[int, int], tuple[Decimal, Decimal]]:
+    """(product, warehouse) -> (on hand, available) for many pairs in three queries; same maths as
+    on_hand() and available()."""
+    pids = {p for p, _ in pairs}
+    if not pids:
+        return {}
+    B, R, z = StockBalance, StockReservation, Decimal("0")
+    q = select(B.product_id, B.warehouse_id, func.sum(B.quantity)).where(B.product_id.in_(pids)) \
+        .group_by(B.product_id, B.warehouse_id)
+    oh = {(p, w): v for p, w, v in db.execute(q)}
+    usable = {(p, w): v for p, w, v in db.execute(q.where(usable_batch()))}
+    res = {(p, w): v for p, w, v in db.execute(select(R.product_id, R.warehouse_id, func.sum(R.quantity))
+                                               .where(R.product_id.in_(pids)).group_by(R.product_id, R.warehouse_id))}
+    return {k: (oh.get(k, z), usable.get(k, z) - res.get(k, z)) for k in pairs}
+
+
 def avg_cost(db: Session, product_id: int) -> Decimal:
     return db.scalar(select(ProductStockCost.avg_cost).where(ProductStockCost.product_id == product_id)) or ZERO
+
+
+def avg_costs(db: Session, product_ids: list[int]) -> dict[int, Decimal]:
+    """avg_cost() for many products in one query (missing -> 0)."""
+    found = dict(db.execute(select(ProductStockCost.product_id, ProductStockCost.avg_cost)
+                            .where(ProductStockCost.product_id.in_(product_ids))).all())
+    return {pid: found.get(pid) or ZERO for pid in product_ids}
 
 
 # ---------- the one write path ----------

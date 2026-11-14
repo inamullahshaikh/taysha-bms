@@ -19,7 +19,7 @@ from app.inventory.models import (
     Warehouse,
 )
 from app.inventory.service import (
-    avg_cost, fill_backorders, get_or_create_batch, issue, move, stock_summary, to_base_qty,
+    avg_costs, fill_backorders, get_or_create_batch, issue, levels, move, stock_summary, to_base_qty,
 )
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
 from app.numbering import next_number
@@ -157,15 +157,16 @@ def balances(db: DB, p: Annotated[ListParams, Depends()], warehouse_id: int | No
             ReorderRule.warehouse_id == warehouse_id, ReorderRule.product_id.in_(ids)))}
     else:
         # company-wide: a product is as bad as its worst warehouse that has a rule (same basis as the dashboard)
-        from app.inventory.service import available, on_hand
-
         rank = {"out_of_stock": 3, "low": 2, "overstock": 1, "ok": 0}
-        for r in db.scalars(select(ReorderRule).where(ReorderRule.product_id.in_(ids))):
-            st = stock_status({"on_hand": on_hand(db, r.product_id, r.warehouse_id),
-                               "available": available(db, r.product_id, r.warehouse_id)}, r)
+        all_rules = db.scalars(select(ReorderRule).where(ReorderRule.product_id.in_(ids))).all()
+        lv = levels(db, {(r.product_id, r.warehouse_id) for r in all_rules})
+        for r in all_rules:
+            oh, av = lv[r.product_id, r.warehouse_id]
+            st = stock_status({"on_hand": oh, "available": av}, r)
             if rank[st] > rank[worst.get(r.product_id, "ok")]:
                 worst[r.product_id] = st
     show_value = can(db, user, "product_costs", "view")
+    costs = avg_costs(db, ids) if show_value else {}
     rows = []
     for prod in products:
         s = summ[prod.id]
@@ -175,7 +176,7 @@ def balances(db: DB, p: Annotated[ListParams, Depends()], warehouse_id: int | No
         row["reorder_point"] = rule.reorder_point if rule else None
         row["status"] = worst.get(prod.id) or stock_status(row, rule)
         if show_value:
-            cost = avg_cost(db, prod.id)
+            cost = costs[prod.id]
             row["avg_cost"], row["value"] = cost, (s["on_hand"] * cost).quantize(Decimal("0.01"))
         rows.append(row)
     if status:
@@ -303,9 +304,10 @@ def list_batches(db: DB, p: Annotated[ListParams, Depends()], product_id: int | 
     if in_stock:
         q = q.where(qty > 0)
     page = paginate(db, q, p, BatchOut)
+    on_hand = dict(db.execute(select(StockBalance.batch_id, func.sum(StockBalance.quantity)).where(
+        StockBalance.batch_id.in_([b.id for b in page["items"]])).group_by(StockBalance.batch_id)).all())
     for b in page["items"]:
-        b.on_hand = db.scalar(select(func.coalesce(func.sum(StockBalance.quantity), 0)).where(
-            StockBalance.batch_id == b.id))
+        b.on_hand = on_hand.get(b.id, Decimal("0"))
     return page
 
 

@@ -8,7 +8,8 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import (
-    Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, or_, select,
+    Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, literal_column, or_, select,
+    union_all,
 )
 from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import JSONB
@@ -255,28 +256,53 @@ def attributed_orders(c: Campaign):
 
 
 def performance(db: Session, c: Campaign, start: date | None, end: date | None, show_cost: bool) -> dict:
-    mq = select(func.coalesce(func.sum(CampaignMetric.spend), 0), func.coalesce(func.sum(CampaignMetric.reach), 0),
-                func.coalesce(func.sum(CampaignMetric.impressions), 0), func.coalesce(func.sum(CampaignMetric.clicks), 0),
-                func.coalesce(func.sum(CampaignMetric.leads), 0), func.coalesce(func.sum(CampaignMetric.conversions), 0)
-                ).where(CampaignMetric.campaign_id == c.id)
-    oq = select(Order).where(attributed_orders(c), Order.status.in_(COUNTED))
+    return performance_many(db, [c], start, end, show_cost)[0]
+
+
+def performance_many(db: Session, campaigns: list[Campaign], start: date | None, end: date | None,
+                     show_cost: bool) -> list[dict]:
+    """Spend, attributed orders, revenue, new customers… per campaign, in a fixed handful of queries."""
+    if not campaigns:
+        return []
+    ids, M, D = [c.id for c in campaigns], CampaignMetric, InfluencerDeal
+    mq = select(M.campaign_id, func.coalesce(func.sum(M.spend), 0), func.coalesce(func.sum(M.reach), 0),
+                func.coalesce(func.sum(M.impressions), 0), func.coalesce(func.sum(M.clicks), 0),
+                func.coalesce(func.sum(M.leads), 0), func.coalesce(func.sum(M.conversions), 0)
+                ).where(M.campaign_id.in_(ids)).group_by(M.campaign_id)
     if start and end:
-        mq = mq.where(CampaignMetric.metric_date.between(start, end))
-        oq = oq.where(Order.order_date.between(start, end))
-    spend, reach, impressions, clicks, leads, conversions = db.execute(mq).one()
-    fees = db.scalar(select(func.coalesce(func.sum(InfluencerDeal.fee), 0)).where(
-        InfluencerDeal.campaign_id == c.id, InfluencerDeal.status != "cancelled"))
-    orders = db.scalars(oq).all()
+        mq = mq.where(M.metric_date.between(start, end))
+    metrics = {r[0]: tuple(r[1:]) for r in db.execute(mq)}
+    fees = dict(db.execute(select(D.campaign_id, func.coalesce(func.sum(D.fee), 0)).where(
+        D.campaign_id.in_(ids), D.status != "cancelled").group_by(D.campaign_id)).all())
+    # (campaign, order) pairs; each campaign keeps its own SQL attribution rule
+    parts = []
+    for c in campaigns:
+        q = select(literal_column(str(int(c.id))).label("cid"), Order.id.label("oid")).where(
+            attributed_orders(c), Order.status.in_(COUNTED))
+        parts.append(q.where(Order.order_date.between(start, end)) if start and end else q)
+    pairs = db.execute(union_all(*parts) if len(parts) > 1 else parts[0]).all()
+    oids = {oid for _, oid in pairs}
+    orders = {o.id: o for o in db.scalars(select(Order).where(Order.id.in_(oids)))} if oids else {}
+    line_cogs = dict(db.execute(select(OrderLine.order_id, func.sum(OrderLine.quantity * func.coalesce(
+        OrderLine.unit_cost, 0))).where(OrderLine.order_id.in_(oids)).group_by(OrderLine.order_id)).all()) if oids else {}
+    # an order brought a new customer if it is that customer's first counted order
+    custs = {o.customer_id for o in orders.values() if o.customer_id}
+    first = dict(db.execute(select(Order.customer_id, func.min(Order.id)).where(
+        Order.customer_id.in_(custs), Order.status.in_(COUNTED)).group_by(Order.customer_id)).all()) if custs else {}
+    by_campaign: dict[int, list[Order]] = {i: [] for i in ids}
+    for cid, oid in pairs:
+        by_campaign[cid].append(orders[oid])
+    return [_performance(c, metrics.get(c.id, (Decimal("0"), 0, 0, 0, 0, 0)), fees.get(c.id, Decimal("0")),
+                         by_campaign[c.id], line_cogs, first, show_cost) for c in campaigns]
+
+
+def _performance(c: Campaign, metrics: tuple, fees: Decimal, orders: list[Order], line_cogs: dict, first: dict,
+                 show_cost: bool) -> dict:
+    spend, reach, impressions, clicks, leads, conversions = metrics
     revenue = sum((o.grand_total for o in orders), ZERO)
     net = sum((o.net_total for o in orders), ZERO)
-    ids = [o.id for o in orders]
-    cogs = db.scalar(select(func.coalesce(func.sum(OrderLine.quantity * func.coalesce(OrderLine.unit_cost, 0)), 0))
-                     .where(OrderLine.order_id.in_(ids))) if ids else ZERO
-    new_customers = 0
-    for o in orders:
-        if o.customer_id and not db.scalar(select(Order.id).where(
-                Order.customer_id == o.customer_id, Order.status.in_(COUNTED), Order.id < o.id).limit(1)):
-            new_customers += 1
+    cogs = sum((line_cogs.get(o.id, ZERO) for o in orders), ZERO)
+    new_customers = sum(1 for o in orders if o.customer_id and first.get(o.customer_id) == o.id)
     total_cost = spend + fees
     out = {"campaign_id": c.id, "name": c.name, "platform": c.platform, "spend": spend, "influencer_fees": fees,
            "total_cost": total_cost, "reach": reach, "impressions": impressions, "clicks": clicks, "leads": leads,
@@ -334,7 +360,7 @@ def marketing_performance(db: DB, range: Range = "month", date_from: date | None
     q = select(Campaign).where(Campaign.archived_at.is_(None))
     if platform:
         q = q.where(Campaign.platform == platform)
-    rows = [performance(db, c, start, end, show) for c in db.scalars(q)]
+    rows = performance_many(db, db.scalars(q).all(), start, end, show)
     rows = [r for r in rows if r["total_cost"] or r["orders"]]
     if group_by == "platform":
         agg: dict[str, dict] = {}
@@ -411,8 +437,8 @@ def marketing_dashboard(db: Session, start: date, end: date) -> dict:
         CampaignMetric.metric_date.between(start, end)))
     leads = db.scalar(select(func.coalesce(func.sum(CampaignMetric.leads), 0)).where(
         CampaignMetric.metric_date.between(start, end)))
-    perf = [performance(db, c, start, end, False) for c in db.scalars(select(Campaign).where(
-        Campaign.archived_at.is_(None)))]
+    perf = performance_many(db, db.scalars(select(Campaign).where(Campaign.archived_at.is_(None))).all(), start, end,
+                            False)
     revenue = sum((p["revenue"] for p in perf), ZERO)
     new = sum(p["new_customers"] for p in perf)
     cost = sum((p["total_cost"] for p in perf), ZERO)

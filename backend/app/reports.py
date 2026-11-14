@@ -178,17 +178,21 @@ def expenses_by(db: Session, start: date, end: date, dim: str) -> list[dict]:
     return [dict(r._mapping) for r in db.execute(q)]
 
 
-def profit_and_loss(db: Session, start: date, end: date) -> dict:
-    s = sales_totals(db, start, end)
+def profit_and_loss(db: Session, start: date, end: date, sales: dict | None = None, expenses: Decimal | None = None,
+                    by_category: bool = True) -> dict:
+    """`sales` / `expenses`: totals the caller already has for this period (saves recomputing them)."""
+    s = sales or sales_totals(db, start, end)
     c = cogs(db, start, end)
     gross = s["net_sales"] - c
-    exp = expense_total(db, start, end)
+    exp = expenses if expenses is not None else expense_total(db, start, end)
     net = gross - exp
     pct = (lambda v: (v / s["net_sales"] * 100).quantize(Decimal("0.1")) if s["net_sales"] else None)
-    return {"net_sales": s["net_sales"], "cogs": c, "gross_profit": gross, "gross_margin_pct": pct(gross),
-            "expenses": exp, "net_profit": net, "net_margin_pct": pct(net), "tax_collected": s["tax_collected"],
-            "discounts": s["discounts"], "refunds": refunds(db, start, end),
-            "expenses_by_category": expenses_by(db, start, end, "category")}
+    out = {"net_sales": s["net_sales"], "cogs": c, "gross_profit": gross, "gross_margin_pct": pct(gross),
+           "expenses": exp, "net_profit": net, "net_margin_pct": pct(net), "tax_collected": s["tax_collected"],
+           "discounts": s["discounts"], "refunds": refunds(db, start, end)}
+    if by_category:
+        out["expenses_by_category"] = expenses_by(db, start, end, "category")
+    return out
 
 
 def monthly_trend(db: Session, months: int = 12) -> list[dict]:
@@ -240,14 +244,16 @@ def customer_metrics(db: Session, start: date, end: date) -> dict:
 def inventory_metrics(db: Session, start: date, end: date, show_value: bool) -> dict:
     from app.inventory.models import Batch, ProductStockCost, ReorderRule, StockBalance, StockReservation, Transfer
     from app.inventory.models import TransferLine
-    from app.inventory.service import available, on_hand
+    from app.inventory.service import levels
 
     t = local_today()
     stocked = select(Product.id).where(Product.track_stock, Product.kind != "bundle", Product.archived_at.is_(None))
     total_qty = db.scalar(select(func.coalesce(func.sum(StockBalance.quantity), 0)))
     low = out = over = short_materials = 0
-    for r, ptype in db.execute(select(ReorderRule, Product.type).join(Product, Product.id == ReorderRule.product_id)):
-        oh, av = on_hand(db, r.product_id, r.warehouse_id), available(db, r.product_id, r.warehouse_id)
+    rules = db.execute(select(ReorderRule, Product.type).join(Product, Product.id == ReorderRule.product_id)).all()
+    lv = levels(db, {(r.product_id, r.warehouse_id) for r, _ in rules})
+    for r, ptype in rules:
+        oh, av = lv[r.product_id, r.warehouse_id]
         is_out = oh <= 0
         is_low = not is_out and r.reorder_point is not None and av <= r.reorder_point
         out, low = out + is_out, low + is_low
@@ -351,27 +357,29 @@ def get_dashboard(user: CurrentUser, db: DB, range: Range = "month", date_from: 
     start, end = period(range, date_from, date_to)
     pstart, pend = previous(start, end)
     out: dict = {"period": {"from": start, "to": end, "previous_from": pstart, "previous_to": pend}}
+    exp_now = None  # this period's expense total, shared by the profit and expenses sections
     if can(db, user, "orders", "view"):
         cur, prev = sales_totals(db, start, end), sales_totals(db, pstart, pend)
+        all_products = sales_by(db, start, end, "product")  # one query serves top, least and most profitable
         out["sales"] = {**cur, "previous": prev, "revenue_growth_pct": growth(cur["revenue"], prev["revenue"]),
                         "order_growth_pct": growth(cur["order_count"], prev["order_count"]),
                         "status_counts": status_counts(db, start, end),
                         "by_channel": sales_by(db, start, end, "channel"),
                         "by_order_type": sales_by(db, start, end, "order_type"),
                         "by_city": sales_by(db, start, end, "city", 10),
-                        "top_products": sales_by(db, start, end, "product", 10)}
-        all_products = sales_by(db, start, end, "product")
+                        "top_products": all_products[:10]}
         out["sales"]["least_products"] = list(reversed(all_products[-5:])) if len(all_products) > 10 else []
-    if can(db, user, "product_costs", "view") and can(db, user, "orders", "view"):
-        pl = profit_and_loss(db, start, end)
-        ranked = sorted(sales_by(db, start, end, "product"), key=lambda r: r["gross_profit"], reverse=True)
-        out["profit"] = {**{k: v for k, v in pl.items() if k != "expenses_by_category"},
-                         "most_profitable": ranked[:5], "least_profitable": list(reversed(ranked[-5:]))}
+        if can(db, user, "product_costs", "view"):
+            exp_now = expense_total(db, start, end)
+            pl = profit_and_loss(db, start, end, sales=cur, expenses=exp_now, by_category=False)
+            ranked = sorted(all_products, key=lambda r: r["gross_profit"], reverse=True)
+            out["profit"] = {**pl, "most_profitable": ranked[:5], "least_profitable": list(reversed(ranked[-5:]))}
     if can(db, user, "expenses", "view"):
         t = local_today()
+        exp_now = exp_now if exp_now is not None else expense_total(db, start, end)
+        exp_before = expense_total(db, pstart, pend)
         out["expenses"] = {
-            "period_total": expense_total(db, start, end), "previous_total": expense_total(db, pstart, pend),
-            "growth_pct": growth(expense_total(db, start, end), expense_total(db, pstart, pend)),
+            "period_total": exp_now, "previous_total": exp_before, "growth_pct": growth(exp_now, exp_before),
             "today": expense_total(db, t, t), "this_month": expense_total(db, t.replace(day=1), t),
             "this_year": expense_total(db, t.replace(month=1, day=1), t),
             "top_categories": expenses_by(db, start, end, "category")[:5],
