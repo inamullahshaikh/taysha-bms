@@ -54,7 +54,7 @@ class Order(Entity, Base):
     delivery_method: Mapped[str] = mapped_column(String(20), default="delivery")  # delivery | pickup
     shipping_address: Mapped[dict | None] = mapped_column(JSONB)  # snapshot
     billing_address: Mapped[dict | None] = mapped_column(JSONB)
-    discount_code_id: Mapped[int | None] = mapped_column(ForeignKey("discount_codes.id"))
+    discount_code_id: Mapped[int | None] = mapped_column(ForeignKey("discount_codes.id"), index=True)
     order_discount_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal(0))
     order_discount_amount: Mapped[Money] = mapped_column(default=Decimal(0))
     subtotal: Mapped[Money] = mapped_column(default=Decimal(0))
@@ -137,7 +137,7 @@ class Payment(Entity, Base):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("sales_documents.id"), index=True)
-    payment_date: Mapped[date] = mapped_column(Date)
+    payment_date: Mapped[date] = mapped_column(Date, index=True)
     method: Mapped[str] = mapped_column(String(20))
     amount: Mapped[Money]  # always positive
     reference: Mapped[str | None] = mapped_column(String(100))

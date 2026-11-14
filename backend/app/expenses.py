@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, select
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.attachments import Attachment
@@ -39,6 +39,7 @@ class CostCentre(Entity, Base):
 
 class Expense(Entity, Base):
     __tablename__ = "expenses"
+    __table_args__ = (Index("ix_expenses_created_by_id", "created_by_id"),)  # "my expenses"
 
     number: Mapped[str] = mapped_column(String(30), unique=True)
     expense_date: Mapped[date] = mapped_column(Date, index=True)
