@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useCan } from '../../lib/auth'
 import { dateTime, qty } from '../../lib/format'
-import { productLabel, useAction, useLookupName, useRefMap } from '../../lib/hooks'
+import { productLabel, useAction, useApprovals, useLookupName, useRefMap } from '../../lib/hooks'
 import { DataTable } from '../../ui/DataTable'
 import { Badge, Button, Card, Confirm, cx, Input, Loading, Status } from '../../ui/kit'
 import { FormDrawer } from '../../ui/Resource'
@@ -47,6 +47,7 @@ export default function Counts() {
 /** Tablet-first count screen: blind count while open, variance review once submitted. */
 export function CountPage() {
   const id = Number(useParams().id)
+  const approvals = useApprovals()
   const can = useCan()
   const qc = useQueryClient()
   const toast = useToast()
@@ -86,7 +87,7 @@ export function CountPage() {
         actions={<>
           {open && can('inventory', 'create') && <>
             <Button disabled={!dirty} loading={save.isPending} onClick={() => save.mutate(undefined)}>Save</Button>
-            <Button variant="primary" disabled={done < c.lines.length} loading={act.isPending} onClick={() => act.mutate('submit')}>Submit for review</Button>
+            <Button variant="primary" disabled={done < c.lines.length} loading={act.isPending} onClick={() => act.mutate('submit')}>{approvals ? 'Submit for review' : 'Finish and update stock'}</Button>
           </>}
           {c.status === 'submitted' && can('inventory', 'approve') && <Button variant="primary" onClick={() => setConfirm('approve')}>Approve & adjust stock</Button>}
           {['open', 'submitted'].includes(c.status) && can('inventory', 'edit') && <Button variant="ghost" onClick={() => setConfirm('cancel')}>Cancel count</Button>}

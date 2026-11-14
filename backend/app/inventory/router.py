@@ -11,6 +11,7 @@ from app.audit import audit
 from app.auth.access import can, require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
+from app.company import approvals_on
 from app.crud import RecordOut, crud_router, get_or_404
 from app.db import DB
 from app.errors import AppError
@@ -19,7 +20,8 @@ from app.inventory.models import (
     Warehouse,
 )
 from app.inventory.service import (
-    avg_costs, fill_backorders, get_or_create_batch, issue, levels, move, stock_summary, to_base_qty,
+    avg_costs, default_warehouse_id, fill_backorders, get_or_create_batch, issue, levels, move, stock_summary,
+    to_base_qty,
 )
 from app.listing import ListParams, Page, apply_filters, export_response, paginate
 from app.numbering import next_number
@@ -170,7 +172,8 @@ def balances(db: DB, p: Annotated[ListParams, Depends()], warehouse_id: int | No
     rows = []
     for prod in products:
         s = summ[prod.id]
-        row = {"product_id": prod.id, "sku": prod.sku, "name": prod.name, "type": prod.type, **s,
+        row = {"product_id": prod.id, "sku": prod.sku, "name": prod.name, "type": prod.type, "unit_id": prod.unit_id,
+               **s,
                "in_transit": Decimal(transit.get(prod.id, ZERO)).quantize(Decimal("0.001"))}
         rule = rules.get(prod.id)
         row["reorder_point"] = rule.reorder_point if rule else None
@@ -337,6 +340,7 @@ class ReceiveLine(BaseModel):
     product_id: int
     quantity: Decimal = Field(gt=0)
     unit: str | None = None  # 'kg', 'carton', ... default = product's unit
+    total_cost: Decimal | None = Field(None, ge=0)  # what was paid for the whole line, instead of unit_cost
     unit_cost: Decimal | None = Field(None, ge=0)  # per entered unit
     batch_number: str | None = None
     mfg_date: date | None = None
@@ -345,7 +349,7 @@ class ReceiveLine(BaseModel):
 
 
 class ReceiveIn(BaseModel):
-    warehouse_id: int
+    warehouse_id: int | None = None  # default: the main warehouse
     reason: Literal["receipt", "opening"] = "receipt"
     reference: str | None = None
     note: str | None = None
@@ -366,7 +370,9 @@ def receive_line(db: Session, warehouse_id: int, ln, reason: str, ref, note, sup
         raise AppError(422, "not_stocked", f"{p.name} isn't stocked")
     check_location(db, ln.location_id, warehouse_id)
     qty = to_base_qty(db, p, ln.quantity, ln.unit)
-    cost = (ln.unit_cost * ln.quantity / qty) if ln.unit_cost is not None else None
+    total = getattr(ln, "total_cost", None)
+    cost = (ln.unit_cost * ln.quantity / qty if ln.unit_cost is not None
+            else total / qty if total is not None else None)
     batch_id = None
     if p.track_batches:
         number = ln.batch_number or f"{local_today():%Y%m%d}-{ref[2] or 'RCV'}"
@@ -382,8 +388,12 @@ def receive_line(db: Session, warehouse_id: int, ln, reason: str, ref, note, sup
 @router.post("/receive", response_model=list[MovementOut], status_code=201)
 def receive(body: ReceiveIn, db: DB, user: User = CREATE):
     """Stock in without a purchase order (opening stock, gifts, found stock)."""
+    body.warehouse_id = body.warehouse_id or default_warehouse_id(db)
+    if body.warehouse_id is None:
+        raise AppError(422, "no_warehouse", "Create a warehouse first")
     get_or_404(db, Warehouse, body.warehouse_id, "Warehouse")
-    if any(ln.unit_cost is not None for ln in body.lines) and not can(db, user, "product_costs", "edit"):
+    if any(ln.unit_cost is not None or ln.total_cost is not None for ln in body.lines) and \
+            not can(db, user, "product_costs", "edit"):
         raise AppError(403, "forbidden", "Entering costs needs product cost access")
     ref = ("receipt", None, body.reference)
     out = [receive_line(db, body.warehouse_id, ln, body.reason, ref, body.note) for ln in body.lines]
@@ -676,7 +686,7 @@ def record_counts(count_id: int, body: list[CountLineIn], db: DB, _: User = CREA
 
 
 @router.post("/counts/{count_id}/submit", response_model=CountOut)
-def submit_count(count_id: int, db: DB, _: User = CREATE):
+def submit_count(count_id: int, db: DB, user: User = CREATE):
     c = get_or_404(db, StockCount, count_id, "Stock count")
     if c.status != "open":
         raise AppError(409, "count_closed", f"Count is {c.status}")
@@ -685,6 +695,8 @@ def submit_count(count_id: int, db: DB, _: User = CREATE):
         raise AppError(422, "uncounted_lines", "Some lines haven't been counted yet")
     c.status = "submitted"
     audit(db, "submit", entity_type="stock_counts", entity_id=c.id)
+    if not approvals_on(db):
+        apply_count(db, c, user)
     return count_out(db, c)
 
 
@@ -695,6 +707,11 @@ def approve_count(count_id: int, db: DB, user: User = APPROVE):
     c = get_or_404(db, StockCount, count_id, "Stock count")
     if c.status != "submitted":
         raise AppError(409, "not_submitted", "Submit the count first")
+    apply_count(db, c, user)
+    return count_out(db, c)
+
+
+def apply_count(db: Session, c: StockCount, user: User) -> None:
     for ln in db.scalars(select(StockCountLine).where(StockCountLine.count_id == c.id)):
         diff = ln.counted_quantity - ln.system_quantity
         if diff:
@@ -703,7 +720,6 @@ def approve_count(count_id: int, db: DB, user: User = APPROVE):
                  note=f"Stock count {c.number}", allow_negative=True)
     c.status, c.approved_by_id, c.approved_at = "approved", user.id, utcnow()
     audit(db, "approve", entity_type="stock_counts", entity_id=c.id)
-    return count_out(db, c)
 
 
 @router.post("/counts/{count_id}/cancel", response_model=CountOut)

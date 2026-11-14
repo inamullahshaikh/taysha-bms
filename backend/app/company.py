@@ -54,6 +54,9 @@ class Company(Entity, Base):
     referral_bonus_points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     discount_approval_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))  # bigger discounts need approval
     refund_approval_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # bigger refunds need approval
+    # off: expenses, purchases, stock counts and journal entries go through on save, and people may approve
+    # their own; discount/refund limits are ignored. On: the full approval workflow.
+    approvals_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Branch(Entity, Base):
@@ -105,6 +108,10 @@ def get_company(db: Session) -> Company:
     return c
 
 
+def approvals_on(db: Session) -> bool:
+    return get_company(db).approvals_required
+
+
 def convert(db: Session, qty: Decimal, from_code: str, to_code: str) -> Decimal:
     """Convert between global units of the same dimension (kg -> g, l -> ml)."""
     if from_code == to_code:
@@ -141,6 +148,7 @@ class CompanyIn(BaseModel):
     referral_bonus_points: int | None = Field(None, ge=0)
     discount_approval_pct: Decimal | None = Field(None, ge=0, le=100)
     refund_approval_amount: Decimal | None = Field(None, ge=0)
+    approvals_required: bool | None = None
 
 
 class CompanyOut(CompanyIn):

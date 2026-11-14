@@ -14,7 +14,7 @@ from app.audit import audit
 from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
-from app.company import get_company
+from app.company import approvals_on, get_company
 from app.crud import RecordOut, get_or_404
 from app.db import DB
 from app.errors import AppError
@@ -41,7 +41,7 @@ Method = Literal["cash", "bank_transfer", "cheque", "card", "online", "other"]
 
 def check_approver(db: Session, user: User, created_by_id: int | None, amount: Decimal) -> None:
     """Same rule as expenses: not your own, and an owner above the company's purchase limit."""
-    if created_by_id == user.id:
+    if created_by_id == user.id and approvals_on(db):
         raise AppError(403, "own_request", "You can't approve your own purchase")
     limit = get_company(db).purchase_approval_limit
     if limit is not None and amount > limit and not user.is_owner:
@@ -112,7 +112,7 @@ pr_router = APIRouter(prefix="/purchase-requests", tags=["purchasing"])
 
 
 @pr_router.post("", response_model=PROut, status_code=201)
-def create_request(body: PRIn, db: DB, _: User = P_CREATE):
+def create_request(body: PRIn, db: DB, user: User = P_CREATE):
     for ln in body.lines:
         get_or_404(db, Product, ln.product_id, "Product")
     est = sum((money(ln.quantity * ln.estimated_unit_cost) for ln in body.lines if ln.estimated_unit_cost), ZERO)
@@ -122,6 +122,8 @@ def create_request(body: PRIn, db: DB, _: User = P_CREATE):
     db.flush()
     db.add_all(PurchaseRequestLine(request_id=r.id, **ln.model_dump()) for ln in body.lines)
     audit(db, "create", r)
+    if not approvals_on(db):
+        r.status, r.decided_by_id, r.decided_at = "approved", user.id, utcnow()
     return pr_out(db, r)
 
 
@@ -407,9 +409,13 @@ def po_transition(db: Session, po: PurchaseOrder, allowed_from: tuple, to: str, 
 
 
 @po_router.post("/{po_id}/submit", response_model=POOut)
-def submit_po(po_id: int, db: DB, _: User = P_CREATE):
+def submit_po(po_id: int, db: DB, user: User = P_CREATE):
+    """Send for approval, or straight to approved when the company doesn't use approvals."""
     po = get_or_404(db, PurchaseOrder, po_id, "Purchase order")
     po_transition(db, po, ("draft",), "requested")
+    if not approvals_on(db):
+        po_transition(db, po, ("requested",), "approved")
+        po.approved_by_id, po.approved_at = user.id, utcnow()
     return po_out(db, po)
 
 

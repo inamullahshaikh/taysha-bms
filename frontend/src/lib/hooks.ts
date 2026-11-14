@@ -81,3 +81,13 @@ export function useAction<TVars = any, TData = any>(
     onError: (e) => toast(e instanceof ApiError ? e.message : 'Something went wrong', 'error'),
   })
 }
+
+/** Whether the company uses approval steps. Off (a small team): things go through as soon as they're saved. */
+export function useApprovals() {
+  const { data } = useQuery({
+    queryKey: ['/settings/company', 'public'],
+    queryFn: () => api.get('/settings/company/public'),
+    staleTime: 30 * 60_000,
+  })
+  return !!data?.approvals_required
+}

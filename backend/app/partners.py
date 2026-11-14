@@ -14,6 +14,7 @@ from app.audit import audit
 from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
+from app.company import approvals_on
 from app.crud import RecordOut, crud_router, get_or_404
 from app.db import DB, Base, Entity, Money
 from app.errors import AppError
@@ -203,7 +204,7 @@ def approve_txn(txn_id: int, db: DB, user: User = APPROVE):
     t = get_or_404(db, PartnerTransaction, txn_id, "Transaction")
     if t.status != "pending":
         raise AppError(409, "decided", f"Already {t.status}")
-    if t.created_by_id == user.id:
+    if t.created_by_id == user.id and approvals_on(db):
         raise AppError(403, "own_entry", "Someone else must approve this")
     t.status, t.approved_by_id, t.approved_at = "approved", user.id, utcnow()
     dr, cr = POSTING[t.kind]

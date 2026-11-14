@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from app.db import DB
 from app.errors import AppError
 from app.inventory.models import Batch, StockMovement
 from app.forecast import in_production, rules_in
-from app.inventory.service import default_warehouse_id, levels, line_backorder, to_base_qty
+from app.inventory.service import available, default_warehouse_id, levels, line_backorder, to_base_qty
 from app.listing import ListParams, Page, apply_filters, paginate
 from app.numbering import next_number
 from app.orders.models import Order, OrderLine
@@ -181,6 +181,20 @@ def recipe_cost(recipe_id: int, db: DB, quantity: Decimal | None = None,
     """Standard cost at current material prices, for one batch or any quantity."""
     r = get_or_404(db, Recipe, recipe_id, "Recipe")
     return standard_cost(db, r, quantity or r.yield_quantity)
+
+
+@recipes.get("/{recipe_id}/check")
+def check_ingredients(recipe_id: int, db: DB, batches: Decimal = Query(Decimal(1), gt=0), _: User = R_VIEW):
+    """Ingredients needed for this many batches against what's free in the main warehouse."""
+    r = get_or_404(db, Recipe, recipe_id, "Recipe")
+    wh = default_warehouse_id(db)
+    lines = []
+    for pid, need in requirements(db, r, r.yield_quantity * batches):
+        p = db.get(Product, pid)
+        have = available(db, pid, wh) if wh else ZERO
+        lines.append({"product_id": pid, "name": p.name, "unit_id": p.unit_id, "needed": need, "available": have,
+                      "short": max(need - have, ZERO)})
+    return {"makes": r.yield_quantity * batches, "lines": lines}
 
 
 @recipes.get("/{recipe_id}/compare/{other_id}")
@@ -355,6 +369,26 @@ def create_production_order(db: Session, body: POIn) -> ProductionOrder:
 @orders.post("", response_model=PROut, status_code=201)
 def create_po(body: POIn, db: DB, user: User = CREATE):
     return pr_out(db, create_production_order(db, body), can_see_cost(db, user))
+
+
+class QuickBatchIn(BaseModel):
+    product_id: int
+    batches: Decimal = Field(gt=0)
+
+
+@orders.post("/quick", response_model=PROut, status_code=201)
+def quick_batch(body: QuickBatchIn, db: DB, user: User = CREATE):
+    """"We made a batch": one step that takes the ingredients out of stock and puts the made product in.
+    All or nothing: if an ingredient is short, nothing is saved."""
+    if not can(db, user, "production", "edit"):
+        raise AppError(403, "forbidden", "Recording a batch needs production edit access")
+    recipe = db.scalar(select(Recipe).where(Recipe.product_id == body.product_id, Recipe.status == "active"))
+    if recipe is None:
+        raise AppError(422, "no_recipe", "This product has no recipe in use yet")
+    po = create_production_order(db, POIn(product_id=body.product_id, recipe_id=recipe.id,
+                                          quantity=recipe.yield_quantity * body.batches, source="quick"))
+    start_po(po.id, db, user)
+    return complete_po(po.id, CompleteIn(output_quantity=po.planned_quantity), db, user)
 
 
 class PRFilters:

@@ -15,6 +15,7 @@ from app.audit import audit
 from app.auth.access import require_access
 from app.auth.models import User
 from app.clock import local_today, utcnow
+from app.company import approvals_on
 from app.crud import RecordOut, crud_router, get_or_404
 from app.db import DB
 from app.errors import AppError
@@ -127,8 +128,9 @@ def read_entry(entry_id: int, db: DB, _: User = VIEW):
 
 
 @router.post("/journal", response_model=JEOut, status_code=201)
-def manual_entry(body: JEIn, db: DB, _: User = CREATE):
-    """Adjustment entry. Saved as a draft; a different person with approve access posts it."""
+def manual_entry(body: JEIn, db: DB, user: User = CREATE):
+    """Adjustment entry. Saved as a draft that a different person with approve access posts, or posted at once
+    when the company doesn't use approvals."""
     for ln in body.lines:
         get_or_404(db, Account, ln.account_id, "Account")
     e = post_entry(db, body.entry_date, [(ln.account_id, ln.debit, ln.credit,
@@ -136,6 +138,8 @@ def manual_entry(body: JEIn, db: DB, _: User = CREATE):
                                                                        "cost_centre_id", "memo")})
                                          for ln in body.lines], body.memo, manual=True, status="draft")
     audit(db, "create", e)
+    if not approvals_on(db):
+        post_draft(db, e, user)
     return je_out(db, e)
 
 
@@ -144,13 +148,17 @@ def approve_entry(entry_id: int, db: DB, user: User = APPROVE):
     e = get_or_404(db, JournalEntry, entry_id, "Journal entry")
     if e.status != "draft":
         raise AppError(409, "not_draft", f"Entry is {e.status}")
-    if e.created_by_id == user.id:
+    if e.created_by_id == user.id and approvals_on(db):
         raise AppError(403, "own_entry", "Someone else must approve your journal entry")
+    post_draft(db, e, user)
+    return je_out(db, e)
+
+
+def post_draft(db: Session, e: JournalEntry, user: User) -> None:
     if is_closed(db, e.entry_date):
         raise AppError(409, "period_closed", "That accounting period is closed")
     e.status, e.number, e.approved_by_id, e.approved_at = "posted", next_number(db, "journal"), user.id, utcnow()
     audit(db, "approve", entity_type="journal_entries", entity_id=e.id)
-    return je_out(db, e)
 
 
 @router.post("/journal/{entry_id}/reject", response_model=JEOut)

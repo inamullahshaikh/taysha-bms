@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { compactMoney, date, money, month } from '../../lib/format'
-import { useLookupName, useLookups, useUrlState } from '../../lib/hooks'
+import { useApprovals, useLookupName, useLookups, useUrlState } from '../../lib/hooks'
 import { BarList, ChartCard, StatTile, TrendChart } from '../../ui/charts'
 import { DataTable } from '../../ui/DataTable'
 import type { FieldDef } from '../../ui/Form'
@@ -60,6 +60,7 @@ export default function Expenses() {
   const toast = useToast()
   const category = useLookupName('expense_categories')
   const { data: lk } = useLookups()
+  const approvals = useApprovals()
 
   return (
     <div className="flex flex-col gap-4">
@@ -92,11 +93,11 @@ export default function Expenses() {
         ]}
       />
       <FormDrawer open={creating} onClose={() => { setCreating(false); setFile(null) }} title="New expense" fields={EXPENSE_FIELDS}
-        submitLabel="Submit for approval"
+        submitLabel={approvals ? 'Submit for approval' : 'Save expense'}
         submit={async (body) => {
           const e = await api.post('/expenses', body)
           if (file) await uploadReceipt(e.id, file).catch(() => toast('Expense saved, but the receipt did not upload', 'error'))
-          toast(`${e.number} submitted`)
+          toast(`${e.number} ${approvals ? 'submitted' : 'saved'}`)
           setFile(null)
           qc.invalidateQueries({ queryKey: ['/expenses'] })
         }}>

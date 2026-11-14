@@ -108,3 +108,12 @@ def user_client(client, make_user):
         return client
 
     return _login
+
+
+@pytest.fixture
+def approvals_required(db):
+    """Turn on the approval workflow (off by default) for tests of it."""
+    from app.company import get_company
+
+    get_company(db).approvals_required = True
+    db.flush()

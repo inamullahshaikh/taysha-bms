@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { CheckCheck, ClipboardList, Package, ShoppingBag, Store, Truck, Users, Wallet, type LucideIcon } from 'lucide-react'
+import {
+  BookOpen, CheckCheck, CookingPot, FlaskConical, Package, ShoppingBag, ShoppingBasket, Store, Truck, Wallet, Wheat, type LucideIcon,
+} from 'lucide-react'
 import { lazy } from 'react'
 import { Link } from 'react-router-dom'
 import { allowed, type Access } from '../../app/section'
@@ -14,11 +16,14 @@ const Dashboard = lazy(() => import('../dashboard/Dashboard'))
 
 const TILES: { to: string; label: string; icon: LucideIcon; access: Access; main?: boolean }[] = [
   { to: '/quick/order', label: 'New order', icon: ShoppingBag, access: 'orders.create', main: true },
+  { to: '/quick/batch', label: 'Make a batch', icon: CookingPot, access: 'production.create', main: true },
   { to: '/quick/expense', label: 'Add expense', icon: Wallet, access: 'expenses.create', main: true },
+  { to: '/quick/supplies', label: 'Bought supplies', icon: ShoppingBasket, access: 'inventory.create' },
   { to: '/pos', label: 'Sell at a stall', icon: Store, access: 'pos' },
-  { to: '/stock', label: 'Check stock', icon: Package, access: 'inventory' },
-  { to: '/orders', label: 'All orders', icon: ClipboardList, access: 'orders' },
-  { to: '/customers', label: 'Customers', icon: Users, access: 'customers' },
+  { to: '/stock?type=raw', label: 'Raw materials', icon: Wheat, access: 'inventory' },
+  { to: '/stock?type=finished', label: 'Product stock', icon: Package, access: 'inventory' },
+  { to: '/recipes', label: 'Recipes', icon: BookOpen, access: 'recipes' },
+  { to: '/rnd/ideas', label: 'New product ideas', icon: FlaskConical, access: 'rnd' },
 ]
 
 /** "/" shows big buttons in simple mode and the full dashboard otherwise. */

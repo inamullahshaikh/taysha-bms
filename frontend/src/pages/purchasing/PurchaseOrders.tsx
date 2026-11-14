@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError, openFile } from '../../lib/api'
 import { useCan } from '../../lib/auth'
 import { compactMoney, date, dateTime, money, qty } from '../../lib/format'
-import { productLabel, useAction, useLookupName, useLookups, useRefMap } from '../../lib/hooks'
+import { productLabel, useAction, useApprovals, useLookupName, useLookups, useRefMap } from '../../lib/hooks'
 import { StatTile } from '../../ui/charts'
 import { DataTable } from '../../ui/DataTable'
 import { Button, Card, Confirm, Drawer, ErrorNote, Facts, Field, Input, Loading, Select, Status } from '../../ui/kit'
@@ -65,6 +65,7 @@ export default function PurchaseOrders() {
 
 export function PurchaseOrderPage() {
   const id = Number(useParams().id)
+  const approvals = useApprovals()
   const can = useCan()
   const qc = useQueryClient()
   const toast = useToast()
@@ -89,7 +90,7 @@ export function PurchaseOrderPage() {
           <Button icon={<FileText className="size-4" />} onClick={() => openFile(`/purchase-orders/${id}/pdf`)}>PDF</Button>
           {s === 'draft' && can('purchasing', 'edit') && <Button onClick={() => setDialog('edit')}>Edit</Button>}
           {['draft', 'requested', 'approved', 'ordered'].includes(s) && can('purchasing', 'edit') && <Button variant="ghost" onClick={() => setDialog('cancel')}>Cancel</Button>}
-          {s === 'draft' && can('purchasing', 'create') && <Button variant="primary" loading={act.isPending} onClick={() => run('submit')}>Submit for approval</Button>}
+          {s === 'draft' && can('purchasing', 'create') && <Button variant="primary" loading={act.isPending} onClick={() => run('submit')}>{approvals ? 'Submit for approval' : 'Confirm order'}</Button>}
           {s === 'requested' && can('purchasing', 'approve') && <>
             <Button onClick={() => setDialog('reject')}>Send back</Button>
             <Button variant="primary" onClick={() => setDialog('approve')}>Approve</Button>

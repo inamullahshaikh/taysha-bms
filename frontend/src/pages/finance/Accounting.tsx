@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { date, dateTime, label, today } from '../../lib/format'
-import { useAction, useRefMap, useUrlState } from '../../lib/hooks'
+import { useAction, useApprovals, useRefMap, useUrlState } from '../../lib/hooks'
 import { DataTable } from '../../ui/DataTable'
 import { cleanLines, LineItems, type FieldDef, type FormValues, type RecordSource } from '../../ui/Form'
 import { Badge, Button, Card, Confirm, Drawer, ErrorNote, Facts, Field, Input, Loading, Segmented, Status } from '../../ui/kit'
@@ -56,6 +56,7 @@ export default function Journal() {
 }
 
 function ManualEntry({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const approvals = useApprovals()
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -95,7 +96,7 @@ function ManualEntry({ open, onClose }: { open: boolean; onClose: () => void }) 
           { name: 'credit', label: 'Credit', type: 'money', width: '120px' },
           { name: 'memo', label: 'Line note', type: 'text' },
         ]} />
-        <p className="text-[12.5px] text-muted">Debits must equal credits. Manual entries post once another person with approval access approves them.</p>
+        <p className="text-[12.5px] text-muted">Debits must equal credits.{approvals && ' Manual entries post once another person with approval access approves them.'}</p>
       </div>
     </Drawer>
   )
@@ -109,13 +110,14 @@ export function JournalEntry() {
   const userName = useRefMap('/users')
   const { data: e, error } = useQuery({ queryKey: [key], queryFn: () => api.get(key) })
   const [ask, setAsk] = useState<'approve' | 'reject' | 'reverse' | null>(null)
+  const approvals = useApprovals()
   const act = useAction((kind: string) => api.post(`${key}/${kind}`, kind === 'reverse' ? {} : undefined), {
     success: 'Done', invalidate: [[key], ['/accounting/journal']],
     onSuccess: (r: any, kind) => { setAsk(null); if (kind === 'reverse') navigate(`/accounting/journal/${r.id}`) },
   })
   if (error) return <ErrorNote error={error} />
   if (!e) return <Loading />
-  const decide = e.status === 'draft' && can('accounting', 'approve') && e.created_by_id !== user.id
+  const decide = e.status === 'draft' && can('accounting', 'approve') && (!approvals || e.created_by_id !== user.id)
   const src = e.source_type && SOURCE_LINK[e.source_type]
   return (
     <>

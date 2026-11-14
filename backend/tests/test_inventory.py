@@ -11,6 +11,9 @@ from app.products.models import Product
 from tests.test_orders import order_body
 from tests.test_products import make_product, price_list, unit_id
 
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
+
+
 D = Decimal
 
 

@@ -1,4 +1,8 @@
+import pytest
+
 from tests.conftest import login
+
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
 
 
 def setup_category(owner_client):

@@ -1,5 +1,9 @@
+import pytest
+
 from tests.conftest import login
 from tests.test_accounting import bal
+
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
 
 
 def test_ownership_votes_and_capital(owner_client, make_user, client):

@@ -5,6 +5,8 @@ import pytest
 from tests.test_inventory import bal, receive
 from tests.test_products import make_product, price_list
 
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
+
 
 @pytest.fixture
 def stall(owner_client):

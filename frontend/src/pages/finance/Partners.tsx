@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { date, label, money, pct, today } from '../../lib/format'
-import { useAction, useRefMap, useUrlState } from '../../lib/hooks'
+import { useAction, useApprovals, useRefMap, useUrlState } from '../../lib/hooks'
 import { SegmentBar } from '../../ui/charts'
 import { DataTable } from '../../ui/DataTable'
 import type { FieldDef } from '../../ui/Form'
@@ -136,6 +136,7 @@ export function Transactions({ partnerId }: { partnerId?: number }) {
   const qc = useQueryClient()
   const toast = useToast()
   const partner = useRefMap('/partners')
+  const approvals = useApprovals()
   const [creating, setCreating] = useState(false)
   const decide = useAction((v: { id: number; kind: 'approve' | 'reject' }) => api.post(`/partner-transactions/${v.id}/${v.kind}`), { success: 'Done', invalidate: [['/partner-transactions'], ['/partners/report']] })
   return (
@@ -152,7 +153,7 @@ export function Transactions({ partnerId }: { partnerId?: number }) {
           { key: 'reference', label: 'Reference' },
           { key: 'status', label: 'Status', render: (r: any) => <Status value={r.status} /> },
           { key: 'amount', label: 'Amount', align: 'right', render: (r: any) => money(r.amount) },
-          { key: 'act', label: '', align: 'right', render: (r: any) => r.status === 'pending' && can('partners', 'approve') && r.created_by_id !== user.id && (
+          { key: 'act', label: '', align: 'right', render: (r: any) => r.status === 'pending' && can('partners', 'approve') && (!approvals || r.created_by_id !== user.id) && (
             <span className="inline-flex gap-1">
               <Button size="sm" variant="ghost" aria-label="Reject" onClick={() => decide.mutate({ id: r.id, kind: 'reject' })}><X className="size-4" /></Button>
               <Button size="sm" icon={<Check className="size-4" />} onClick={() => decide.mutate({ id: r.id, kind: 'approve' })}>Approve</Button>
@@ -160,7 +161,7 @@ export function Transactions({ partnerId }: { partnerId?: number }) {
           ) },
         ]} />
       <FormDrawer open={creating} onClose={() => setCreating(false)} title="Record partner money" fields={TXN} initial={{ partner_id: partnerId ?? '', txn_date: today(), method: 'bank_transfer' }}
-        submit={async (body) => { await api.post('/partner-transactions', body); toast('Recorded. Another partner approves it before it posts.'); qc.invalidateQueries({ queryKey: ['/partner-transactions'] }) }} />
+        submit={async (body) => { await api.post('/partner-transactions', body); toast(approvals ? 'Recorded. Another partner approves it before it posts.' : 'Recorded. Approve it to post it.'); qc.invalidateQueries({ queryKey: ['/partner-transactions'] }) }} />
     </>
   )
 }

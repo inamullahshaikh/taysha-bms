@@ -1,5 +1,9 @@
+import pytest
+
 from tests.conftest import login
 from tests.test_orders import order_body, setup  # noqa: F401
+
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
 
 
 def test_big_discount_and_refund_need_approval(setup, client, make_user):  # noqa: F811

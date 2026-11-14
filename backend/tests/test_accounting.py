@@ -5,6 +5,8 @@ from tests.test_inventory import receive
 from tests.test_orders import order_body
 from tests.test_products import make_product, price_list, unit_id
 
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
+
 
 def acct(c, code):
     return next(a for a in c.get("/accounting/accounts?page_size=200").json()["items"] if a["code"] == code)

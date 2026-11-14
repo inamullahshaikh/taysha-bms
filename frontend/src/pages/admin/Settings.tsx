@@ -76,6 +76,8 @@ const companyFields: FieldDef[] = [
 ]
 
 const ruleFields: FieldDef[] = [
+  { name: 'approvals_required', label: 'Use approval steps', type: 'bool', full: true,
+    hint: 'Off: expenses, purchases, stock counts and journal entries go through as soon as they are saved. On: someone else approves them first, and the limits below apply.' },
   { name: 'expense_approval_limit', label: 'Expense approval limit', type: 'money', hint: 'Above this, only an owner can approve. Empty: no limit.' },
   { name: 'purchase_approval_limit', label: 'Purchase approval limit', type: 'money', hint: 'Above this, only an owner can approve a PO.' },
   { name: 'discount_approval_pct', label: 'Discounts above (%) need approval', type: 'number' },

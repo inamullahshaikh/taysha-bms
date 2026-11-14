@@ -16,7 +16,7 @@ from app.auth.access import can, require_access
 from app.auth.deps import CurrentUser
 from app.auth.models import User
 from app.clock import utcnow
-from app.company import get_company
+from app.company import approvals_on, get_company
 from app.crud import get_or_404
 from app.db import DB, Base, Entity, Money
 from app.errors import AppError, KeepChangesError
@@ -47,7 +47,7 @@ def require_approval(db: Session, kind: str, entity_type: str, entity_id: int, a
                      payload: dict | None = None) -> None:
     """Raise 409 approval_required unless an approved request for exactly this exists (owners skip)."""
     user = current_user(db)
-    if user and user.is_owner:
+    if (user and user.is_owner) or not approvals_on(db):
         return
     base = select(ApprovalRequest).where(ApprovalRequest.kind == kind, ApprovalRequest.entity_type == entity_type,
                                          ApprovalRequest.entity_id == entity_id, ApprovalRequest.amount == amount)
@@ -122,7 +122,7 @@ def approve(req_id: int, body: DecisionIn, db: DB, user: User = APPROVE):
     req = get_or_404(db, ApprovalRequest, req_id, "Approval request")
     if req.status != "pending":
         raise AppError(409, "decided", f"Already {req.status}")
-    if req.created_by_id == user.id:
+    if req.created_by_id == user.id and approvals_on(db):
         raise AppError(403, "own_request", "Someone else must approve this")
     req.status, req.decided_by_id, req.decided_at, req.note = "approved", user.id, utcnow(), body.note
     execute(db, req)
@@ -142,17 +142,18 @@ def reject(req_id: int, body: DecisionIn, db: DB, user: User = APPROVE):
 
 @router.get("/inbox")
 def inbox(user: CurrentUser, db: DB):
-    """Everything waiting for this user's decision (never their own requests)."""
+    """Everything waiting for this user's decision (not their own requests while approvals are on)."""
     from app.accounting.models import JournalEntry
     from app.expenses import Expense
     from app.partners import Partner, PartnerTransaction
     from app.purchasing.models import PurchaseOrder, PurchaseRequest
 
     items = []
+    others_only = approvals_on(db)  # without approval steps, leftovers of your own show up too
 
     def add(kind, rows, title, amount, link):
         for r in rows:
-            if r.created_by_id == user.id:
+            if others_only and r.created_by_id == user.id:
                 continue
             items.append({"type": kind, "id": r.id, "title": title(r), "amount": amount(r),
                           "requested_by_id": r.created_by_id, "requested_at": r.created_at, "link": link(r)})

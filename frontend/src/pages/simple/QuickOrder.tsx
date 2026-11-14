@@ -15,7 +15,7 @@ const PAY = [
   { value: 'cod', label: 'Cash on delivery' }, { value: 'cash', label: 'Cash now' },
   { value: 'bank_transfer', label: 'Bank transfer' }, { value: 'online', label: 'Online / wallet' },
 ]
-// ponytail: fixed delivery fees; move to company settings if they change often
+// common delivery fees as buttons; anything else is typed under "Other amount"
 const FEES = ['0', '150', '200', '250', '300']
 
 /** Order by tapping: who, what, how it gets there, how they pay. Totals come from the server. */
@@ -34,6 +34,7 @@ export default function QuickOrder() {
   const [line1, setLine1] = useState('')
   const [city, setCity] = useState('')
   const [fee, setFee] = useState('0')
+  const [otherFee, setOtherFee] = useState(false) // typing an amount instead of a button
   const [pay, setPay] = useState('cod')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -68,7 +69,7 @@ export default function QuickOrder() {
     customer_id: customer?.id, channel: channel || undefined, order_type: 'retail', payment_method: pay,
     delivery_method: delivery, lines,
     ...(delivery === 'delivery' && {
-      delivery_charge: fee,
+      delivery_charge: fee || '0',
       ...(typeof address === 'number' ? { shipping_address_id: address }
         : line1 && city ? { shipping_address: { line1, city } } : {}),
     }),
@@ -88,7 +89,7 @@ export default function QuickOrder() {
 
   const reset = () => {
     setCustomer(null); setChannel(''); setCart({}); setDelivery('delivery'); setAddrPick(undefined)
-    setLine1(''); setCity(''); setFee('0'); setPay('cod'); setError(null); setDone(null)
+    setLine1(''); setCity(''); setFee('0'); setOtherFee(false); setPay('cod'); setError(null); setDone(null)
     window.scrollTo(0, 0)
   }
 
@@ -185,7 +186,16 @@ export default function QuickOrder() {
               </div>
             )}
             <p className="mt-4 mb-2 text-[13px] font-medium text-ink-2">Delivery charge</p>
-            <Pick value={fee} onChange={setFee} options={FEES.map((f) => ({ value: f, label: f === '0' ? 'Free' : money(f) }))} />
+            <Pick value={otherFee ? 'other' : fee}
+              onChange={(v) => { if (v === 'other') { setOtherFee(true); setFee('') } else { setOtherFee(false); setFee(v) } }}
+              options={[...FEES.map((f) => ({ value: f, label: f === '0' ? 'Free' : money(f) })), { value: 'other', label: 'Other amount' }]} />
+            {otherFee && (
+              <div className="relative mt-2.5 sm:max-w-60">
+                <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[15px] text-muted">Rs</span>
+                <Input type="number" inputMode="decimal" min="0" autoFocus className="h-12 pl-11 text-[16px]" placeholder="0"
+                  aria-label="Delivery charge in rupees" value={fee} onChange={(e) => setFee(e.target.value)} />
+              </div>
+            )}
           </>}
         </Step>
 

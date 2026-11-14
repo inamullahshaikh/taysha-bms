@@ -1,14 +1,15 @@
 import logo from '../assets/logo.webp'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bell, CheckCheck, ChevronsUpDown, ClipboardList, House, KeyRound, LayoutGrid, LockKeyhole, LogOut, Menu as MenuIcon, Package, ShoppingBag,
-  Store, Tag, Users, Wallet, X, type LucideIcon,
+  Bell, BookOpen, CheckCheck, ChevronsUpDown, ClipboardList, CookingPot, FlaskConical, House, KeyRound, LayoutGrid, LockKeyhole, LogOut,
+  Menu as MenuIcon, Package, ShoppingBag, ShoppingBasket, Store, Tag, Users, Wallet, Wheat, X, type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ago } from '../lib/format'
+import { useApprovals } from '../lib/hooks'
 import { setSimple, useSimple } from '../lib/simple'
 import { cx, Empty, IconButton, Loading, Menu, MenuItem, PageHeader, Tabs } from '../ui/kit'
 import { SECTIONS } from '../modules'
@@ -33,15 +34,20 @@ export function useVisibleSections() {
 }
 
 /** The short menu in simple mode: the everyday jobs of a small team. */
-const SIMPLE_NAV: { to: string; label: string; icon: LucideIcon; access: Access }[] = [
+const SIMPLE_NAV: { to: string; label: string; icon: LucideIcon; access: Access; gap?: boolean }[] = [
   { to: '/', label: 'Home', icon: House, access: '*' },
   { to: '/quick/order', label: 'New order', icon: ShoppingBag, access: 'orders.create' },
   { to: '/orders', label: 'Orders', icon: ClipboardList, access: 'orders' },
   { to: '/pos', label: 'Stall sales', icon: Store, access: 'pos' },
-  { to: '/stock', label: 'Stock', icon: Package, access: 'inventory' },
-  { to: '/expenses', label: 'Expenses', icon: Wallet, access: ['expenses', 'expenses.create'] },
-  { to: '/customers', label: 'Customers', icon: Users, access: 'customers' },
+  { to: '/quick/batch', label: 'Make a batch', icon: CookingPot, access: 'production.create', gap: true },
+  { to: '/quick/supplies', label: 'Bought supplies', icon: ShoppingBasket, access: 'inventory.create' },
+  { to: '/stock?type=raw', label: 'Raw materials', icon: Wheat, access: 'inventory' },
+  { to: '/recipes', label: 'Recipes', icon: BookOpen, access: 'recipes' },
+  { to: '/rnd/ideas', label: 'New product ideas', icon: FlaskConical, access: 'rnd' },
+  { to: '/stock?type=finished', label: 'Product stock', icon: Package, access: 'inventory', gap: true },
   { to: '/products', label: 'Products', icon: Tag, access: 'products' },
+  { to: '/customers', label: 'Customers', icon: Users, access: 'customers' },
+  { to: '/expenses', label: 'Expenses', icon: Wallet, access: ['expenses', 'expenses.create'] },
   { to: '/approvals', label: 'Approvals', icon: CheckCheck, access: ['approvals.approve', 'expenses.approve', 'purchasing.approve'] },
 ]
 
@@ -50,10 +56,17 @@ const navCls = (active: boolean) => cx('group relative mb-0.5 flex items-center 
 
 function SimpleLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { can } = useAuth()
-  return SIMPLE_NAV.filter((l) => allowed(can, l.access)).map((l) => (
-    <NavLink key={l.to} to={l.to} end={l.to === '/'} onClick={onNavigate} className={({ isActive }) => cx(navCls(isActive), 'h-11 text-[15px]')}>
-      <l.icon className="size-5 shrink-0" strokeWidth={1.75} />{l.label}
-    </NavLink>
+  const approvals = useApprovals()
+  const { pathname, search } = useLocation()
+  // a link with a ?filter is active only on that filter; others on their path and below
+  const active = (to: string) => (to.includes('?') ? pathname + search === to : to === '/' ? pathname === '/' : pathname.startsWith(to))
+  return SIMPLE_NAV.filter((l) => allowed(can, l.access) && (l.to !== '/approvals' || approvals)).map((l) => (
+    <div key={l.to}>
+      {l.gap && <div className="mx-2 my-2 h-px bg-white/10" />}
+      <Link to={l.to} onClick={onNavigate} className={cx(navCls(active(l.to)), 'h-10 text-[14.5px]')}>
+        <l.icon className="size-5 shrink-0" strokeWidth={1.75} />{l.label}
+      </Link>
+    </div>
   ))
 }
 

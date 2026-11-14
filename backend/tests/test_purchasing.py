@@ -4,6 +4,8 @@ from tests.conftest import login
 from tests.test_inventory import bal
 from tests.test_products import make_product, unit_id
 
+pytestmark = pytest.mark.usefixtures("approvals_required")  # these tests cover the approval workflow
+
 
 @pytest.fixture
 def pur(owner_client):

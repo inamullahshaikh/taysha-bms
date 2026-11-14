@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { date, dateTime, label, money } from '../../lib/format'
-import { useAction, useLookupName, useRefMap } from '../../lib/hooks'
+import { useAction, useApprovals, useLookupName, useRefMap } from '../../lib/hooks'
 import { Button, Card, Confirm, ErrorNote, Facts, Loading, Status } from '../../ui/kit'
 import { Attachments, History, RecordHeader, RecordLayout } from '../../ui/Record'
 import { FormDrawer } from '../../ui/Resource'
@@ -24,6 +24,7 @@ export default function ExpenseDetail() {
   const dept = useLookupName('departments')
   const branch = useLookupName('branches')
   const userName = useRefMap('/users')
+  const approvals = useApprovals()
   const act = useAction((a: { kind: string; note?: string }) => api.post(`${key}/${a.kind}`, a.kind === 'cancel' ? undefined : { note: a.note || null }),
     { success: 'Done', invalidate: [[key], ['/expenses']], onSuccess: () => setAsk(null) })
 
@@ -31,7 +32,7 @@ export default function ExpenseDetail() {
   if (!e) return <Loading />
   const open = e.status === 'submitted'
   const own = e.created_by_id === user.id
-  const canDecide = open && !own && can('expenses', 'approve')
+  const canDecide = open && (!own || !approvals) && can('expenses', 'approve')
   const canEdit = open && (own || can('expenses', 'edit'))
 
   return (
@@ -65,7 +66,7 @@ export default function ExpenseDetail() {
               <Facts items={[['By', userName(e.decided_by_id)], ['When', dateTime(e.decided_at)], ['Note', e.decision_note]]} />
             </Card>
           )}
-          {own && open && !can('expenses', 'approve') && <p className="text-[13px] text-ink-2">Waiting for a manager to approve. Nobody can approve their own expense.</p>}
+          {own && open && approvals && !can('expenses', 'approve') && <p className="text-[13px] text-ink-2">Waiting for a manager to approve. Nobody can approve their own expense.</p>}
         </>}
         side={<>
           <Attachments entity="expenses" id={id} canEdit={canEdit} />

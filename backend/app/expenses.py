@@ -15,7 +15,7 @@ from app.auth.access import can, require_access
 from app.auth.deps import CurrentUser
 from app.auth.models import User
 from app.clock import local_today, utcnow
-from app.company import get_company
+from app.company import approvals_on, get_company
 from app.crud import RecordOut, crud_router, get_or_404
 from app.db import DB, Base, Entity, Money
 from app.errors import AppError
@@ -210,12 +210,14 @@ def read_expense(expense_id: int, db: DB, user: CurrentUser):
 
 
 @router.post("", response_model=ExpenseOut, status_code=201)
-def submit_expense(body: ExpenseIn, db: DB, _: User = CREATE):
+def submit_expense(body: ExpenseIn, db: DB, user: User = CREATE):
     validate_refs(db, body)
     e = Expense(number=next_number(db, "expense"), status="submitted",
                 **{**body.model_dump(), "expense_date": body.expense_date or local_today()})
     db.add(e)
     audit(db, "create", e)
+    if not approvals_on(db):
+        decide(db, user, e, "approved", None)
     return out(db, e)
 
 
@@ -237,7 +239,7 @@ def update_expense(expense_id: int, body: ExpenseIn, db: DB, user: CurrentUser):
 def decide(db: Session, user: User, e: Expense, status: str, note: str | None) -> None:
     if e.status != "submitted":
         raise AppError(409, "decided", f"This expense is already {e.status}")
-    if e.created_by_id == user.id:
+    if e.created_by_id == user.id and approvals_on(db):
         raise AppError(403, "own_expense", "You can't approve or reject your own expense")
     limit = get_company(db).expense_approval_limit
     if status == "approved" and limit is not None and e.amount > limit and not user.is_owner:
