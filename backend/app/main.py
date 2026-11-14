@@ -5,18 +5,46 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
 
 from app import (  # noqa: F401
-    approvals, assets, attachments, audit_router, automation, backup, barcodes, company, crm, customers, errors,
-    expenses, forecast, insights, jobs, lookups, marketing, models, notifications, partners, pos, receivables,
-    records, reports, returns, rnd, suppliers, tasks, wholesale,
+    approvals,
+    assets,
+    attachments,
+    audit_router,
+    automation,
+    backup,
+    barcodes,
+    company,
+    crm,
+    customers,
+    errors,
+    expenses,
+    forecast,
+    insights,
+    jobs,
+    lookups,
+    marketing,
+    models,
+    notifications,
+    partners,
+    pos,
+    receivables,
+    records,
+    reports,
+    returns,
+    rnd,
+    suppliers,
+    tasks,
+    wholesale,
 )
-from app.auth import mfa_router, router as auth_router, users_router
 from app.accounting import router as accounting
+from app.auth import mfa_router, users_router
+from app.auth import router as auth_router
 from app.config import settings
 from app.documents import router as documents
 from app.integrations import shopify
 from app.inventory import router as inventory
 from app.orders import router as orders
-from app.production import quality, router as production
+from app.production import quality
+from app.production import router as production
 from app.products import router as products
 from app.purchasing import router as purchasing
 

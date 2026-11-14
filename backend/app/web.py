@@ -52,8 +52,8 @@ async def frontend(request: Request):
 class SecurityHeaders:
     """What the Caddy config added on a server; Railway's edge terminates TLS but doesn't add these."""
 
-    HEADERS = [(b"strict-transport-security", b"max-age=31536000"), (b"x-content-type-options", b"nosniff"),
-               (b"x-frame-options", b"DENY"), (b"referrer-policy", b"strict-origin-when-cross-origin")]
+    HEADERS = ((b"strict-transport-security", b"max-age=31536000"), (b"x-content-type-options", b"nosniff"),
+               (b"x-frame-options", b"DENY"), (b"referrer-policy", b"strict-origin-when-cross-origin"))
 
     def __init__(self, app: ASGIApp):
         self.app = app
