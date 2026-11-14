@@ -4,11 +4,13 @@ from fastapi import APIRouter
 from sqlalchemy import select
 
 from app.auth.deps import CurrentUser
+from app.auth.models import User
 from app.company import Branch, Department, TaxRate, Unit
 from app.db import DB
 from app.expenses import CostCentre, ExpenseCategory
 from app.inventory.models import Warehouse
 from app.products.models import PriceList, ProductCategory, SalesChannel
+from app.wholesale import Territory
 
 router = APIRouter(tags=["lookups"])
 
@@ -31,6 +33,9 @@ def lookups(_: CurrentUser, db: DB):
         "expense_categories": _rows(db, ExpenseCategory, "name", "parent_id"),
         "cost_centres": _rows(db, CostCentre, "code", "name"),
         "warehouses": _rows(db, Warehouse, "code", "name"),
+        "territories": _rows(db, Territory, "name"),
+        # names only (for "assigned to", "created by", history); the user list itself stays with access_management
+        "users": [{"id": u.id, "name": u.name} for u in db.scalars(select(User).order_by(User.name))],
     }
 
 routers = [router]
