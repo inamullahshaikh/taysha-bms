@@ -4,7 +4,7 @@ from fastapi import FastAPI, encoders
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import (  # noqa: F401
-    approvals, attachments, audit_router, backup, barcodes, company, crm, customers, errors, expenses, jobs,
+    approvals, assets, attachments, audit_router, backup, barcodes, company, crm, customers, errors, expenses, jobs,
     lookups, marketing, models, notifications, partners, pos, receivables, records, reports, returns, suppliers,
     tasks, wholesale,
 )
@@ -40,7 +40,7 @@ errors.install(app)
 MODULES = (
     auth_router, mfa_router, users_router, audit_router, attachments, company, lookups, products, customers,
     suppliers, orders, documents, jobs, expenses, reports, backup, inventory, purchasing, barcodes, notifications,
-    returns, receivables, production, quality, shopify, pos, wholesale, marketing, crm, accounting, partners, tasks, approvals, records,
+    returns, receivables, production, quality, shopify, pos, wholesale, marketing, crm, accounting, partners, tasks, approvals, records, assets,
 )
 for module in MODULES:
     for r in module.routers:

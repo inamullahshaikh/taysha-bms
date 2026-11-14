@@ -76,6 +76,12 @@ def _post_ledger(db: Session) -> str:
     return str(post_pending(db))
 
 
+def _depreciation(db: Session) -> str:
+    from app.assets import depreciate
+
+    return depreciate(db)
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -96,6 +102,7 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "recurring_orders": (timedelta(hours=1), _recurring),
     "loyalty_points": (timedelta(hours=6), _loyalty),
     "ledger_posting": (timedelta(minutes=5), _post_ledger),
+    "depreciation": (timedelta(days=1), _depreciation),
     "shopify_orders": (timedelta(minutes=15), _shopify("poll_orders")),
     "shopify_stock": (timedelta(minutes=10), _shopify("push_stock")),
     "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),
