@@ -71,6 +71,9 @@ def check_parent(db: Session, user: User, entity_type: str, entity_id: int, acti
     own = len(row) > 1 and row[1] == user.id  # people may attach files to records they created (e.g. receipts)
     if not own:
         ensure(db, user, feature, action)
+    conf = table.c.get("confidential")
+    if conf is not None and db.scalar(select(conf).where(table.c.id == entity_id)):
+        ensure(db, user, "confidential_documents", "view")
 
 
 # ponytail: local disk storage (a mounted volume). Add an S3 backend if the app moves to several servers.

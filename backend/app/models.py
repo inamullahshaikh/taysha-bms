@@ -19,3 +19,4 @@ from app.accounting import models as accounting_models  # noqa: F401
 from app import partners  # noqa: F401
 from app import tasks  # noqa: F401
 from app import approvals  # noqa: F401
+from app import records  # noqa: F401

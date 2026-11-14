@@ -40,6 +40,7 @@ KINDS: dict[str, tuple[str, str, str]] = {
     "failed_sync": ("Integration sync failed", "settings", "view"),
     "follow_up": ("Customer follow-up due", "customers", "view"),
     "task_overdue": ("Task overdue", "tasks", "view"),
+    "document_expiry": ("Document expiring", "documents", "view"),
 }
 EXPIRY_WARNING_DAYS = 14
 DISPATCH_DELAY_DAYS = 2
@@ -217,6 +218,13 @@ def check_alerts(db: Session) -> str:
             db.add(Notification(user_id=f.assigned_to_id, kind="follow_up", title=f"Follow-up due: {f.note[:80]}",
                                 link=f"/customers/{f.customer_id}" if f.customer_id else f"/leads/{f.lead_id}"))
             sent += 1
+
+    # documents inside their reminder window
+    from app.records import expiring
+
+    for d in expiring(db):
+        when = "expired" if d.expiry_date < t else f"expires {d.expiry_date:%d %b %Y}"
+        hit("document_expiry", str(d.id), f"{d.title} {when}", d.category, f"/documents/{d.id}")
 
     # overdue tasks go to their assignee
     from app.tasks import overdue_tasks
