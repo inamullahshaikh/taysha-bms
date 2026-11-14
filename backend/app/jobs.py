@@ -70,6 +70,12 @@ def _loyalty(db: Session) -> str:
     return award_points(db)
 
 
+def _post_ledger(db: Session) -> str:
+    from app.accounting.posting import post_pending
+
+    return str(post_pending(db))
+
+
 def _backup(db: Session) -> str:
     from app.backup import run_backup
 
@@ -89,6 +95,7 @@ JOBS: dict[str, tuple[timedelta, Callable[[Session], str]]] = {
     "alerts": (timedelta(minutes=30), _alerts),
     "recurring_orders": (timedelta(hours=1), _recurring),
     "loyalty_points": (timedelta(hours=6), _loyalty),
+    "ledger_posting": (timedelta(minutes=5), _post_ledger),
     "shopify_orders": (timedelta(minutes=15), _shopify("poll_orders")),
     "shopify_stock": (timedelta(minutes=10), _shopify("push_stock")),
     "shopify_fulfilments": (timedelta(minutes=10), _shopify("push_fulfilments")),

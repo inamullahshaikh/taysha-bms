@@ -36,6 +36,7 @@ DOC_TYPES: dict[str, tuple[str, str]] = {
     "pos_sale": ("POS-", "POS sale"),
     "recall": ("RCL-", "Recall"),
     "route": ("RT-", "Delivery route"),
+    "journal": ("JE-", "Journal entry"),
 }
 
 

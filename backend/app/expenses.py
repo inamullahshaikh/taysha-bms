@@ -27,6 +27,7 @@ class ExpenseCategory(Entity, Base):
     __tablename__ = "expense_categories"
     name: Mapped[str] = mapped_column(String(120))
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("expense_categories.id"))  # subcategories
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"))  # ledger account (default 6000)
 
 
 class CostCentre(Entity, Base):
@@ -64,6 +65,7 @@ class Expense(Entity, Base):
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1)
     parent_id: int | None = None
+    account_id: int | None = None
 
 
 class CategoryOut(RecordOut, CategoryIn):
@@ -230,6 +232,10 @@ def decide(db: Session, user: User, e: Expense, status: str, note: str | None) -
     limit = get_company(db).expense_approval_limit
     if status == "approved" and limit is not None and e.amount > limit and not user.is_owner:
         raise AppError(403, "over_limit", f"Expenses over {limit} need an owner's approval")
+    if status == "approved":
+        from app.accounting.router import check_budget  # accounting builds on expenses
+
+        check_budget(db, user, e)
     e.status, e.decided_by_id, e.decided_at, e.decision_note = status, user.id, utcnow(), note
     audit(db, status, entity_type="expenses", entity_id=e.id, note=note)
 
