@@ -80,9 +80,21 @@ Workspace → Usage: set an email alert, and a hard limit if you want a ceiling.
 
 ## Config as code
 
-Railway is replacing `railway.toml` with `.railway/railway.ts` (the old files stop being read on 2026-12-01).
-Once the project is set up as above, `railway config pull` writes that file from the live settings, and
-`railway config plan` / `apply` manage changes from then on.
+The service settings above live in [.railway/railway.ts](.railway/railway.ts) (Singapore region, Dockerfile
+builds, pre-deploy migrations, health check, the jobs cron, watch paths, the `/data` volume, limits). Variables are
+not in it: they stay in Railway so secrets never reach the repo. After editing it, from the repo root:
+
+```sh
+npm install                 # once: the railway/iac package the file imports
+railway config plan         # preview
+railway config apply        # apply
+```
+
+On Windows the package's CLI version check runs `$_`, which is the npm wrapper script, not the CLI itself. Point it
+at the real executable first, in PowerShell:
+`$env:_ = "$env:APPDATA
+pm
+ode_modules\@railway\cliinailway.exe"`.
 
 ## What keeps the bill low
 
