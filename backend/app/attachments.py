@@ -148,7 +148,9 @@ def download(attachment_id: int, user: CurrentUser, db: DB):
     path = Path(settings.upload_dir) / a.storage_key
     if not path.exists():
         raise not_found("File content")
-    return FileResponse(path, media_type=a.content_type, filename=a.filename)
+    # a stored version never changes (a new upload is a new attachment), so the browser may keep it
+    return FileResponse(path, media_type=a.content_type, filename=a.filename,
+                        headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
 @router.post("/{attachment_id}/archive", response_model=AttachmentOut)

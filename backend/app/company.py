@@ -296,7 +296,7 @@ def get_logo(db: DB):
     if not c.logo_key:
         raise AppError(404, "not_found", "No logo uploaded")
     return Response(read_file(c.logo_key), media_type=c.logo_content_type,
-                    headers={"Cache-Control": "max-age=300"})
+                    headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.post("/tax-rates/{id}/make-default", response_model=TaxRateOut)
