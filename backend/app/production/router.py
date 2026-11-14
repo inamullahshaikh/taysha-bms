@@ -14,8 +14,9 @@ from app.clock import local_today, utcnow
 from app.crud import RecordOut, get_or_404
 from app.db import DB
 from app.errors import AppError
-from app.inventory.models import Batch, ReorderRule, StockMovement
-from app.inventory.service import available, default_warehouse_id, line_backorder, to_base_qty
+from app.inventory.models import Batch, StockMovement
+from app.forecast import in_production, rules_in
+from app.inventory.service import default_warehouse_id, levels, line_backorder, to_base_qty
 from app.listing import ListParams, Page, apply_filters, paginate
 from app.numbering import next_number
 from app.orders.models import Order, OrderLine
@@ -501,11 +502,6 @@ def production_pdf(po_id: int, db: DB, doc: Literal["batch_sheet", "pick_list"] 
 planning = APIRouter(prefix="/production", tags=["production"])
 
 
-def in_production(db: Session, product_id: int) -> Decimal:
-    return db.scalar(select(func.coalesce(func.sum(ProductionOrder.planned_quantity), 0)).where(
-        ProductionOrder.product_id == product_id, ProductionOrder.status.in_(("draft", "released", "in_progress"))))
-
-
 @planning.get("/suggestions")
 def suggestions(db: DB, warehouse_id: int | None = None, _: User = VIEW):
     """What to make: backordered quantities plus anything below its reorder point, rounded up to whole batches."""
@@ -515,13 +511,17 @@ def suggestions(db: DB, warehouse_id: int | None = None, _: User = VIEW):
     out = []
     active = db.execute(select(Recipe, Product).join(Product, Product.id == Recipe.product_id)
                         .where(Recipe.status == "active", Product.archived_at.is_(None))).all()
+    pids = {p.id for _, p in active}
+    rules, lv, made = rules_in(db, pids, wh), levels(db, {(pid, wh) for pid in pids}), in_production(db, pids)
+    open_lines: dict[int, list[OrderLine]] = {pid: [] for pid in pids}
+    for ln in db.scalars(select(OrderLine).join(Order).where(
+            OrderLine.product_id.in_(pids), Order.status.in_(("confirmed", "processing", "packed")))):
+        open_lines[ln.product_id].append(ln)
     for recipe, p in active:
-        backordered = sum((line_backorder(db, ln) for ln in db.scalars(
-            select(OrderLine).join(Order).where(OrderLine.product_id == p.id,
-                                                Order.status.in_(("confirmed", "processing", "packed"))))), ZERO)
-        rule = db.get(ReorderRule, (p.id, wh))
-        avail = available(db, p.id, wh)
-        coming = in_production(db, p.id)
+        backordered = sum((line_backorder(db, ln) for ln in open_lines[p.id]), ZERO)
+        rule = rules.get(p.id)
+        avail = lv[p.id, wh][1]
+        coming = made[p.id]
         below = ZERO
         if rule and rule.reorder_point is not None and avail + coming <= rule.reorder_point:
             target = rule.max_qty or (rule.reorder_point + (rule.reorder_qty or recipe.yield_quantity))

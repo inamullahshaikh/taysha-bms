@@ -18,7 +18,7 @@ from app.auth.models import User
 from app.clock import local_today
 from app.db import DB
 from app.inventory.models import ReorderRule
-from app.inventory.service import available, default_warehouse_id
+from app.inventory.service import default_warehouse_id, levels
 from app.orders.models import Order, OrderLine
 from app.production.models import ProductionMaterial, ProductionOrder, Recipe, RecipeLine
 from app.products.models import Product
@@ -87,20 +87,31 @@ def demand(db: DB, months: int = 3, product_id: int | None = None, _: User = req
     return sorted(out, key=lambda r: -sum(f["quantity"] for f in r["forecast"]))
 
 
-def in_production(db: Session, pid: int) -> Decimal:
-    return db.scalar(select(func.coalesce(func.sum(ProductionOrder.planned_quantity), 0)).where(
-        ProductionOrder.product_id == pid, ProductionOrder.status.in_(("draft", "released", "in_progress"))))
+def in_production(db: Session, pids: set[int]) -> dict[int, Decimal]:
+    """Planned quantity in open production orders per product (missing -> 0)."""
+    P = ProductionOrder
+    found = dict(db.execute(select(P.product_id, func.sum(P.planned_quantity)).where(
+        P.product_id.in_(pids), P.status.in_(("draft", "released", "in_progress"))).group_by(P.product_id)).all())
+    return {pid: found.get(pid, Decimal("0")) for pid in pids}
+
+
+def rules_in(db: Session, pids: set[int], wh: int) -> dict[int, ReorderRule]:
+    return {r.product_id: r for r in db.scalars(select(ReorderRule).where(
+        ReorderRule.warehouse_id == wh, ReorderRule.product_id.in_(pids)))}
 
 
 def production_plan(db: Session, months: int, wh: int) -> list[dict]:
     hist, first = monthly_demand(db)
     out = []
-    for recipe, p in db.execute(select(Recipe, Product).join(Product, Product.id == Recipe.product_id)
-                                .where(Recipe.status == "active")):
+    active = db.execute(select(Recipe, Product).join(Product, Product.id == Recipe.product_id)
+                        .where(Recipe.status == "active")).all()
+    pids = {p.id for _, p in active}
+    rules, lv, made = rules_in(db, pids, wh), levels(db, {(pid, wh) for pid in pids}), in_production(db, pids)
+    for recipe, p in active:
         demand_qty = sum(forecast_series(hist[p.id], months), ZERO) if p.id in hist else ZERO
-        rule = db.get(ReorderRule, (p.id, wh))
+        rule = rules.get(p.id)
         safety = (rule.safety_stock or ZERO) if rule else ZERO
-        avail, coming = available(db, p.id, wh), in_production(db, p.id)
+        avail, coming = lv[p.id, wh][1], made[p.id]
         need = demand_qty + safety - avail - coming
         batches = (need / recipe.yield_quantity).to_integral_value(rounding=ROUND_CEILING) if need > 0 else ZERO
         out.append({"product_id": p.id, "name": p.name, "forecast": demand_qty, "safety_stock": safety,
@@ -124,9 +135,14 @@ def materials(db: DB, warehouse_id: int | None = None, cover_days: int = 30,
     if wh is None:
         return []
     need: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    for row in production_plan(db, 1, wh):  # next month's suggested production
-        r = db.get(Recipe, row["recipe_id"])
-        for ln in db.scalars(select(RecipeLine).where(RecipeLine.recipe_id == r.id)):
+    plan = production_plan(db, 1, wh)  # next month's suggested production
+    recipes = {r.id: r for r in db.scalars(select(Recipe).where(Recipe.id.in_([row["recipe_id"] for row in plan])))}
+    lines: dict[int, list[RecipeLine]] = defaultdict(list)
+    for ln in db.scalars(select(RecipeLine).where(RecipeLine.recipe_id.in_(recipes)).order_by(RecipeLine.id)):
+        lines[ln.recipe_id].append(ln)
+    for row in plan:
+        r = recipes[row["recipe_id"]]
+        for ln in lines[r.id]:
             need[ln.product_id] += ln.base_quantity * row["suggested_quantity"] / r.yield_quantity * (
                 1 + ln.wastage_pct / 100)
     for m in db.scalars(select(ProductionMaterial).join(ProductionOrder).where(
@@ -137,25 +153,32 @@ def materials(db: DB, warehouse_id: int | None = None, cover_days: int = 30,
                                .join(PurchaseOrder).where(PurchaseOrder.status.in_(
                                    ("approved", "ordered", "partially_received")))
                                .group_by(PurchaseOrderLine.product_id)).all())
+    pids = set(need)
+    products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_(pids)))}
+    best: dict[int, SupplierItem] = {}  # preferred supplier item per product (else the first one)
+    for item in db.scalars(select(SupplierItem).where(SupplierItem.product_id.in_(pids))
+                           .order_by(SupplierItem.product_id, SupplierItem.is_preferred.desc(), SupplierItem.id)):
+        best.setdefault(item.product_id, item)
+    suppliers = {s.id: s for s in db.scalars(select(Supplier).where(
+        Supplier.id.in_({i.supplier_id for i in best.values()})))}
+    rules, lv = rules_in(db, pids, wh), levels(db, {(pid, wh) for pid in pids})
     out = []
     for pid, qty in need.items():
-        p = db.get(Product, pid)
-        item = db.scalar(select(SupplierItem).where(SupplierItem.product_id == pid)
-                         .order_by(SupplierItem.is_preferred.desc()).limit(1))
+        p, item, avail = products[pid], best.get(pid), lv[pid, wh][1]
         lead = (item.lead_time_days or 7) if item else 7
         window = Decimal(lead + cover_days) / 30  # need is for ~one month of production
-        rule = db.get(ReorderRule, (pid, wh))
+        rule = rules.get(pid)
         target = qty * window + ((rule.safety_stock or ZERO) if rule else ZERO)
-        short = target - available(db, pid, wh) - on_order.get(pid, ZERO)
+        short = target - avail - on_order.get(pid, ZERO)
         if short <= 0:
             continue
         if item and item.min_order_qty and short < item.min_order_qty:
             short = item.min_order_qty
         out.append({"product_id": pid, "name": p.name, "type": p.type, "needed": qty.quantize(Q),
-                    "available": available(db, pid, wh), "on_order": on_order.get(pid, ZERO),
+                    "available": avail, "on_order": on_order.get(pid, ZERO),
                     "lead_time_days": lead, "suggested_order": short.quantize(Q),
                     "supplier_id": item.supplier_id if item else None,
-                    "supplier": db.get(Supplier, item.supplier_id).name if item else None})
+                    "supplier": suppliers[item.supplier_id].name if item else None})
     return sorted(out, key=lambda r: -r["suggested_order"])
 
 
