@@ -41,6 +41,7 @@ FEATURES: dict[str, tuple[str, tuple[str, ...]]] = {
     "documents": ("Documents & files", (V, C, E, A)),
     "confidential_documents": ("Confidential documents", (V,)),
     "assets": ("Assets & equipment", (V, C, E, A)),
+    "reports": ("Scheduled & shared reports", (V, C, E, A)),
 }
 
 # Table name -> feature that guards it (for record history and attachments)
@@ -80,4 +81,5 @@ ENTITY_FEATURE: dict[str, str] = {
     "approval_requests": "approvals",
     "document_records": "documents",
     **{t: "assets" for t in ("assets", "asset_maintenance")},
+    **{t: "reports" for t in ("scheduled_reports", "saved_views")},
 }
