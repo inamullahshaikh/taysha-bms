@@ -125,12 +125,21 @@ router = APIRouter(prefix="/expenses", tags=["expenses"])
 CREATE, EDIT, APPROVE = (require_access("expenses", a) for a in ("create", "edit", "approve"))
 
 
+def outs(db: Session, expenses: list[Expense]) -> list[ExpenseOut]:
+    """Expenses with has_receipt, one attachment query for the whole list."""
+    with_file = set(db.scalars(select(Attachment.entity_id).where(
+        Attachment.entity_type == "expenses", Attachment.entity_id.in_([e.id for e in expenses]),
+        Attachment.archived_at.is_(None)).distinct()))
+    out_ = []
+    for e in expenses:
+        o = ExpenseOut.model_validate(e)
+        o.has_receipt = e.id in with_file
+        out_.append(o)
+    return out_
+
+
 def out(db: Session, e: Expense) -> ExpenseOut:
-    o = ExpenseOut.model_validate(e)
-    o.has_receipt = db.scalar(select(Attachment.id).where(
-        Attachment.entity_type == "expenses", Attachment.entity_id == e.id, Attachment.archived_at.is_(None))
-        .limit(1)) is not None
-    return o
+    return outs(db, [e])[0]
 
 
 def get_expense(db: Session, user: User, expense_id: int) -> Expense:
@@ -181,7 +190,7 @@ def list_query(db: Session, user: User, p: ListParams, f: ExpenseFilters):
 def list_expenses(db: DB, user: CurrentUser, p: Annotated[ListParams, Depends()],
                   f: Annotated[ExpenseFilters, Depends()]):
     page = paginate(db, list_query(db, user, p, f), p)
-    page["items"] = [out(db, e) for e in page["items"]]
+    page["items"] = outs(db, page["items"])
     return page
 
 

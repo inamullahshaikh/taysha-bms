@@ -85,13 +85,27 @@ class DecisionIn(BaseModel):
     note: str | None = None
 
 
+def _lines_by(db: Session, fk, ids: list[int], order) -> dict[int, list]:
+    """Child rows of many parents in one query: parent id -> rows in `order`."""
+    out: dict[int, list] = {i: [] for i in ids}
+    for ln in db.scalars(select(fk.class_).where(fk.in_(ids)).order_by(order)):
+        out[getattr(ln, fk.key)].append(ln)
+    return out
+
+
+def pr_outs(db: Session, rs: list[PurchaseRequest]) -> list[PROut]:
+    lines = _lines_by(db, PurchaseRequestLine.request_id, [r.id for r in rs], PurchaseRequestLine.id)
+    out = []
+    for r in rs:
+        o = PROut.model_validate(r)
+        o.lines = [{k: getattr(ln, k) for k in ("id", "product_id", "quantity", "unit", "estimated_unit_cost",
+                                                "suggested_supplier_id", "note")} for ln in lines[r.id]]
+        out.append(o)
+    return out
+
+
 def pr_out(db: Session, r: PurchaseRequest) -> PROut:
-    o = PROut.model_validate(r)
-    o.lines = [{k: getattr(ln, k) for k in ("id", "product_id", "quantity", "unit", "estimated_unit_cost",
-                                            "suggested_supplier_id", "note")}
-               for ln in db.scalars(select(PurchaseRequestLine).where(PurchaseRequestLine.request_id == r.id)
-                                    .order_by(PurchaseRequestLine.id))]
-    return o
+    return pr_outs(db, [r])[0]
 
 
 pr_router = APIRouter(prefix="/purchase-requests", tags=["purchasing"])
@@ -117,7 +131,7 @@ def list_requests(db: DB, p: Annotated[ListParams, Depends()], status: str | Non
     if status:
         q = q.where(PurchaseRequest.status == status)
     page = paginate(db, q, p)
-    page["items"] = [pr_out(db, r) for r in page["items"]]
+    page["items"] = pr_outs(db, page["items"])
     return page
 
 
@@ -259,11 +273,20 @@ def po_lines(db: Session, po_id: int) -> list[PurchaseOrderLine]:
                       .order_by(PurchaseOrderLine.line_no)).all()
 
 
+def po_outs(db: Session, pos: list[PurchaseOrder]) -> list[POOut]:
+    db.scalars(select(Supplier).where(Supplier.id.in_({po.supplier_id for po in pos}))).all()  # into identity map
+    lines = _lines_by(db, PurchaseOrderLine.purchase_order_id, [po.id for po in pos], PurchaseOrderLine.line_no)
+    out = []
+    for po in pos:
+        o = POOut.model_validate(po)
+        o.supplier_name = db.get(Supplier, po.supplier_id).name
+        o.lines = [POLineOut.model_validate(x) for x in lines[po.id]]
+        out.append(o)
+    return out
+
+
 def po_out(db: Session, po: PurchaseOrder) -> POOut:
-    o = POOut.model_validate(po)
-    o.supplier_name = db.get(Supplier, po.supplier_id).name
-    o.lines = [POLineOut.model_validate(x) for x in po_lines(db, po.id)]
-    return o
+    return po_outs(db, [po])[0]
 
 
 po_router = APIRouter(prefix="/purchase-orders", tags=["purchasing"])
@@ -329,15 +352,15 @@ class POFilters:
 @po_router.get("", response_model=Page[POOut])
 def list_pos(db: DB, p: Annotated[ListParams, Depends()], f: Annotated[POFilters, Depends()], _: User = P_VIEW):
     page = paginate(db, f.apply(apply_filters(select(PurchaseOrder), PurchaseOrder, p, SEARCH, SORTS)), p)
-    page["items"] = [po_out(db, x) for x in page["items"]]
+    page["items"] = po_outs(db, page["items"])
     return page
 
 
 @po_router.get("/export")
 def export_pos(db: DB, p: Annotated[ListParams, Depends()], f: Annotated[POFilters, Depends()],
                format: str = "csv", _: User = P_EXPORT):
-    rows = [po_out(db, x).model_dump() for x in db.scalars(f.apply(apply_filters(
-        select(PurchaseOrder), PurchaseOrder, p, SEARCH, SORTS)))]
+    rows = [o.model_dump() for o in po_outs(db, db.scalars(f.apply(apply_filters(
+        select(PurchaseOrder), PurchaseOrder, p, SEARCH, SORTS))).all())]
     cols = [("number", "PO"), ("order_date", "Date"), ("supplier_name", "Supplier"), ("status", "Status"),
             ("expected_date", "Expected"), ("subtotal", "Subtotal"), ("tax_total", "Tax"), ("grand_total", "Total")]
     return export_response(db, rows, cols, format, "purchase-orders", "purchase_orders")
@@ -470,12 +493,20 @@ class GROut(RecordOut):
     lines: list[dict] = []
 
 
+def gr_outs(db: Session, gs: list[GoodsReceipt]) -> list[GROut]:
+    lines = _lines_by(db, GoodsReceiptLine.receipt_id, [g.id for g in gs], GoodsReceiptLine.id)
+    out = []
+    for g in gs:
+        o = GROut.model_validate(g)
+        o.lines = [{k: getattr(ln, k) for k in ("id", "po_line_id", "product_id", "quantity", "unit", "base_quantity",
+                                                "batch_id", "supplier_batch_no", "expiry_date", "qc_result",
+                                                "qc_note")} for ln in lines[g.id]]
+        out.append(o)
+    return out
+
+
 def gr_out(db: Session, g: GoodsReceipt) -> GROut:
-    o = GROut.model_validate(g)
-    o.lines = [{k: getattr(ln, k) for k in ("id", "po_line_id", "product_id", "quantity", "unit", "base_quantity",
-                                            "batch_id", "supplier_batch_no", "expiry_date", "qc_result", "qc_note")}
-               for ln in db.scalars(select(GoodsReceiptLine).where(GoodsReceiptLine.receipt_id == g.id))]
-    return o
+    return gr_outs(db, [g])[0]
 
 
 @po_router.post("/{po_id}/receive", response_model=GROut, status_code=201)
@@ -542,7 +573,7 @@ def list_receipts(db: DB, p: Annotated[ListParams, Depends()], supplier_id: int 
     if purchase_order_id:
         q = q.where(GoodsReceipt.purchase_order_id == purchase_order_id)
     page = paginate(db, q, p)
-    page["items"] = [gr_out(db, g) for g in page["items"]]
+    page["items"] = gr_outs(db, page["items"])
     return page
 
 
@@ -625,13 +656,20 @@ class SupplierPaymentOut(RecordOut):
     created_at: datetime
 
 
+def bill_outs(db: Session, bills: list[SupplierBill]) -> list[BillOut]:
+    lines = _lines_by(db, SupplierBillLine.bill_id, [b.id for b in bills], SupplierBillLine.id)
+    out = []
+    for b in bills:
+        o = BillOut.model_validate(b)
+        o.lines = [{k: getattr(ln, k) for k in ("id", "po_line_id", "product_id", "description", "quantity",
+                                                "unit_cost", "tax_rate", "tax_amount", "line_total")}
+                   for ln in lines[b.id]]
+        out.append(o)
+    return out
+
+
 def bill_out(db: Session, b: SupplierBill) -> BillOut:
-    o = BillOut.model_validate(b)
-    o.lines = [{k: getattr(ln, k) for k in ("id", "po_line_id", "product_id", "description", "quantity", "unit_cost",
-                                            "tax_rate", "tax_amount", "line_total")}
-               for ln in db.scalars(select(SupplierBillLine).where(SupplierBillLine.bill_id == b.id)
-                                    .order_by(SupplierBillLine.id))]
-    return o
+    return bill_outs(db, [b])[0]
 
 
 def refresh_bill(db: Session, b: SupplierBill) -> None:
@@ -743,7 +781,7 @@ BILL_SORTS = {"bill_date": SupplierBill.bill_date, "due_date": SupplierBill.due_
 @bill_router.get("", response_model=Page[BillOut])
 def list_bills(db: DB, p: Annotated[ListParams, Depends()], f: Annotated[BillFilters, Depends()], _: User = B_VIEW):
     page = paginate(db, f.apply(apply_filters(select(SupplierBill), SupplierBill, p, BILL_SEARCH, BILL_SORTS)), p)
-    page["items"] = [bill_out(db, b) for b in page["items"]]
+    page["items"] = bill_outs(db, page["items"])
     return page
 
 

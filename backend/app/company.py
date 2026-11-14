@@ -321,7 +321,10 @@ def seq_out(s: NumberSequence) -> SequenceOut:
 
 @router.get("/numbering", response_model=list[SequenceOut])
 def list_numbering(db: DB, _: User = VIEW):
-    return [seq_out(get_sequence(db, t)) for t in DOC_TYPES]
+    for t in DOC_TYPES.keys() - set(db.scalars(select(NumberSequence.doc_type))):
+        get_sequence(db, t)  # creates the missing default (rare: new document types)
+    seqs = {s.doc_type: s for s in db.scalars(select(NumberSequence))}
+    return [seq_out(seqs[t]) for t in DOC_TYPES]
 
 
 @router.patch("/numbering/{doc_type}", response_model=SequenceOut)
