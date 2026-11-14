@@ -288,7 +288,7 @@ crud_routers = [
 routers = [router, *crud_routers]
 
 
-def _txn_defaults(target, *_):  # date defaults to today for transactions created through the generic CRUD
+def _txn_defaults(mapper, connection, target):  # date defaults to today for transactions created through the generic CRUD
     if target.txn_date is None:
         target.txn_date = local_today()
 
