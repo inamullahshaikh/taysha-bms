@@ -29,7 +29,7 @@ export default function Events() {
   const recent = useQuery({
     queryKey: ['/pos/events', 'recent'],
     queryFn: async () => {
-      const closed = asPage(await api.get('/pos/events', { status: 'closed', page_size: 8, sort: '-start_date' })).items
+      const closed = asPage(await api.get('/pos/events', { status: 'closed', page_size: 8 })).items
       if (!closed.length) return []
       return api.get<any[]>('/pos/events/compare', { ids: closed.map((e: any) => e.id).reverse().join(',') })
     },
