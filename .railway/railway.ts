@@ -17,7 +17,7 @@ export default defineRailway(() => {
   const postgresVolume = volume("postgres-volume", {
     alerts: { usage: { "100": {}, "80": {}, "95": {} } }, allowOnlineResize: true, region: REGION, sizeMB: 5000,
   });
-  const appData = volume("app-data", { alerts: { usage: { "80": {}, "95": {} } }, region: REGION });
+  const appData = volume("app-data", { alerts: { usage: { "100": {}, "80": {}, "95": {} } }, region: REGION, sizeMB: 5000 });
 
   // API under /api and the built frontend
   const app = service("app", {
@@ -29,7 +29,7 @@ export default defineRailway(() => {
       limitOverride: { containers: { cpu: 1, memoryBytes: 1 * GB } },
     },
     replicas: { [REGION]: 1 },
-    volumeMounts: { "app-data": { mountPath: "/data", backupSchedules: ["DAILY"] } },
+    volumeMounts: { "/data": appData }, // uploaded files; turn on daily backups in the volume's Backups tab
   });
 
   // background jobs: runs whatever is due, then exits
