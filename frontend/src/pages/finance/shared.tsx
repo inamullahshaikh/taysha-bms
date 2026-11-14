@@ -35,6 +35,14 @@ export function usePeriod(fallback: Range = 'month') {
   return { params, control }
 }
 
+/** Compact date input for toolbars (the kit Input is full width). */
+export function DateInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <input type="date" aria-label={label} title={label} value={value} onChange={(e) => onChange(e.target.value)}
+      className="h-8 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink focus:border-wine-600 focus:outline-none" />
+  )
+}
+
 /** Excel/CSV download menu for report endpoints that take ?format=. Shown only with export access. */
 export function ExportMenu({ feature, path, params, formats = ['xlsx', 'csv'] }: {
   feature: string; path: string; params?: Record<string, any>; formats?: string[]
