@@ -6,9 +6,12 @@ import { useToast } from '../ui/toast'
 type Row = { id: number; name?: string; code?: string; [k: string]: any }
 export type Lookups = Record<
   | 'sales_channels' | 'price_lists' | 'units' | 'tax_rates' | 'branches' | 'departments'
-  | 'product_categories' | 'expense_categories' | 'cost_centres' | 'warehouses',
+  | 'product_categories' | 'expense_categories' | 'cost_centres' | 'warehouses' | 'territories' | 'users',
   Row[]
 >
+
+/** Lists any signed-in user may read through /lookups even when the full endpoint needs admin access. */
+export const FROM_LOOKUPS: Record<string, keyof Lookups> = { '/users': 'users', '/territories': 'territories' }
 
 /** Small dropdown lists any signed-in user may read. */
 export function useLookups() {
@@ -26,13 +29,17 @@ export function useLookupName(kind: keyof Lookups) {
 
 /** id → label for a small resource (products, suppliers, users…). One request, cached; empty if no access. */
 export function useRefMap(path: string, toLabel: (r: any) => string = (r) => r.name ?? r.number ?? `#${r.id}`) {
+  const kind = FROM_LOOKUPS[path]
+  const lookups = useLookups()
   const { data } = useQuery({
     queryKey: ['refmap', path],
     queryFn: async () => asPage(await api.get(path, { page_size: 500 })).items,
     staleTime: 5 * 60_000,
     retry: false,
+    enabled: !kind,
   })
-  const map = new Map<number, string>((data ?? []).map((r: any) => [r.id, toLabel(r)]))
+  const rows = kind ? lookups.data?.[kind] : data
+  const map = new Map<number, string>((rows ?? []).map((r: any) => [r.id, toLabel(r)]))
   return (id?: number | null) => (id == null ? '—' : (map.get(id) ?? `#${id}`))
 }
 

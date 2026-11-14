@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, asPage } from '../lib/api'
-import { productLabel, useLookups, type Lookups } from '../lib/hooks'
+import { FROM_LOOKUPS, productLabel, useLookups, type Lookups } from '../lib/hooks'
 import { Checkbox, cx, Field, IconButton, Input, Select, Textarea, Button } from './kit'
 
 export type FieldDef = {
@@ -145,18 +145,26 @@ export function RecordSelect({ source, value, onChange, id, invalid, placeholder
   const [picked, setPicked] = useState<{ id: string; label: string } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const pickedLabel = picked && picked.id === String(value) ? picked.label : null
-  const results = useQuery({
+  // users and territories come from /lookups so pickers work without admin access
+  const kind = FROM_LOOKUPS[source.path]
+  const lookups = useLookups()
+  const local = kind ? (lookups.data?.[kind] ?? []) : null
+  const remote = useQuery({
     queryKey: ['pick', source.path, q, source.params],
     queryFn: async () => asPage(await api.get(source.path, { ...source.params, q, page_size: 20 })).items,
-    enabled: open,
+    enabled: open && !kind,
   })
-  const selected = useQuery({
+  const results = local
+    ? { data: local.filter((r) => toLabel(r).toLowerCase().includes(q.toLowerCase())).slice(0, 20), isLoading: lookups.isLoading }
+    : remote
+  const fetched = useQuery({
     queryKey: [`${source.path}/${value}`],
     queryFn: () => api.get(`${source.path}/${value}`),
-    enabled: !!value && !pickedLabel,
+    enabled: !!value && !pickedLabel && !kind,
     staleTime: 60_000,
     retry: false,
   })
+  const selected = local ? { data: local.find((r) => String(r.id) === String(value)), isError: false } : fetched
   useEffect(() => {
     if (!open) return
     const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
